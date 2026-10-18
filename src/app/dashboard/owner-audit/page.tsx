@@ -1,0 +1,3 @@
+import {db} from '@/lib/db';
+import {requireStaffPage} from '@/lib/staff-access';
+export default async function Page(){await requireStaffPage();const records=await db.ownerAudit.findMany({orderBy:{createdAt:'desc'},take:100});return <div><h1>Owner audit history</h1><p>Latest 100 access, authentication, and platform changes. Operational interventions also appear in the operational audit log. Runtime database roles must have no update/delete grants on audit tables.</p>{records.map(r=><article className="card conversation" key={r.id}><div className="eyebrow">{r.createdAt.toISOString()}</div><h2>{r.action.replaceAll('_',' ')}</h2><p>{r.actorName} · Record {r.entityId}</p><pre className="audit-json">{JSON.stringify(r.details,null,2)}</pre></article>)}</div>;}

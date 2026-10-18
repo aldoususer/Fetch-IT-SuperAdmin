@@ -1,0 +1,21 @@
+import Link from 'next/link';
+import {notFound} from 'next/navigation';
+import {db} from '@/lib/db';
+import {requireStaffPage} from '@/lib/staff-access';
+import {caseScope,hasPermission} from '@/lib/staff-policy';
+import {ActionForm} from '@/components/action-form';
+export default async function Page({params}:{params:Promise<{id:string}>}){
+  const staff=await requireStaffPage();const{id}=await params;
+  const record=await db.workflowCase.findFirst({where:{id,...caseScope(staff)},include:{notes:{orderBy:{createdAt:'asc'}}}});if(!record)notFound();
+  const booking=record.bookingId?await db.booking.findUnique({where:{id:record.bookingId},select:{refCode:true,type:true,status:true,totalFare:true,paymentMethod:true,paymentStatus:true,paymentReference:true,demoRiderEarnings:true,demoPayoutAt:true,...(record.kind==='SAFETY'?{pickupLabel:true,dropoffLabel:true,riderId:true,customerId:true}: {})}}):null;
+  const operations=hasPermission(staff.role,'operations'),canManage=operations||record.kind==='ESCALATION'&&hasPermission(staff.role,'support.manage');
+  const assignees=canManage?await db.user.findMany({where:{isBanned:false,role:{in:record.kind==='FINANCE'?['FINANCE','ADMIN']:record.kind==='SAFETY'?['SAFETY','ADMIN']:['SUPPORT','SUPPORT_SUPERVISOR','ADMIN']}},select:{id:true,name:true},orderBy:{name:'asc'}}):[];
+  const url=`/api/cases/${id}`,version=record.version;
+  return <div><Link href="/dashboard/cases">← Review queue</Link><div className="page-heading"><div><div className="eyebrow">{record.kind} · {record.priority}</div><h1>{record.title}</h1><p>{record.status.replaceAll('_',' ')} · Opened by {record.createdByName}</p></div></div><section className="card conversation"><h2>Reported issue</h2><p className="preserve-lines">{record.summary}</p>{booking&&<><h3>Linked booking</h3><p>{booking.refCode} · {booking.type} · {booking.status}</p><p>₱{booking.totalFare.toFixed(2)} · {booking.paymentMethod} · {booking.paymentStatus}</p>{record.kind==='SAFETY'&&<p>{booking.pickupLabel} → {booking.dropoffLabel}</p>}{operations&&<Link className="btn" href={`/dashboard/bookings/${record.bookingId}`}>Open operational controls</Link>}</>}{record.recommendation&&<><h3>Recommendation</h3><p className="preserve-lines">{record.recommendation}</p></>}{record.decision&&<><h3>Admin decision</h3><p className="preserve-lines">{record.decision}</p></>}{record.notes.map(n=><article className="conversation-message" key={n.id}><strong>{n.authorName}</strong><time>{n.createdAt.toISOString()}</time><p className="preserve-lines">{n.body}</p></article>)}</section>
+    {!record.assignedToId&&<ActionForm url={url} method="PATCH" hidden={{action:'claim',version}} label="Claim case"/>}
+    {canManage&&<ActionForm url={url} method="PATCH" hidden={{action:'assign',version}} label="Assign reviewer" fields={[{name:'assignedToId',label:'Reviewer',options:assignees.map(a=>({value:a.id,label:a.name}))}]}/>}
+    {(record.assignedToId===staff.id||canManage)&&<><ActionForm url={url} method="PATCH" hidden={{action:'note',version}} label="Append internal evidence / note" fields={[{name:'note',label:'Note (preserved in case history)',type:'textarea',required:true}]}/><ActionForm url={url} method="PATCH" hidden={{action:'recommend',version}} label="Submit recommendation to Admin" fields={[{name:'recommendation',label:'Findings and recommended action',type:'textarea',required:true}]}/></>}
+    {operations&&record.status==='AWAITING_ADMIN'&&<ActionForm url={url} method="PATCH" hidden={{action:'decide',version}} label="Record decision" confirm fields={[{name:'outcome',label:'Decision',options:[{value:'APPROVED',label:'Approve recommendation'},{value:'REJECTED',label:'Return for more review'}]},{name:'reason',label:'Decision reason',type:'textarea',required:true}]}/>}
+    {canManage&&<ActionForm url={url} method="PATCH" hidden={{action:'close',version}} label="Close resolved case" fields={[{name:'reason',label:'Resolution and action/reference recorded',type:'textarea',required:true}]}/>}
+    <p className="muted small">Case approval records a decision; it does not itself charge, refund, transfer money, or restrict an account. Admin uses validated operational controls and records the outcome here.</p></div>;
+}
