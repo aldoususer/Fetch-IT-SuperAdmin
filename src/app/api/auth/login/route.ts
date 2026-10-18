@@ -1,1 +1,3 @@
-export async function POST(){return Response.json({error:'Use approved passkey sign-in.'},{status:404});}
+import {NextRequest} from 'next/server';
+import {ownerPasswordRoute} from '@/lib/owner-password-auth';
+export async function POST(req: NextRequest) { return ownerPasswordRoute(req, 'login'); }

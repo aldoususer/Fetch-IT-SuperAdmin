@@ -52,7 +52,7 @@ export function withRequestLog<Args extends [NextRequest, ...unknown[]]>(scope: 
     let code: string | undefined;
     try {
       if(!['GET','HEAD','OPTIONS'].includes(args[0].method)){
-        if(args[0].headers.get('origin')!==ownerConfig().origin || !await currentOwner(true)) return NextResponse.json({error:'Confirm your identity with a passkey before this action.'},{status:401});
+        if(args[0].headers.get('origin')!==ownerConfig().origin || !await currentOwner(true)) return NextResponse.json({error:'Confirm your password in Security & sessions before this action.'},{status:401});
       }
       const origin=args[0].headers.get("origin");
       if(scope.startsWith("admin:") && !["GET","HEAD","OPTIONS"].includes(args[0].method) && ((origin && origin!==args[0].nextUrl.origin) || args[0].headers.get("sec-fetch-site")==="cross-site")) {

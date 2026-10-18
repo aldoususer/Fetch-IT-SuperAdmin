@@ -16,14 +16,10 @@ export const POST=ownerRoute(async(req,owner)=>{
       const identity=await tx.ownerIdentity.create({data:{actorId:actor.id,name:actor.name,email}});id=identity.id;
       await tx.ownerInvitation.create({data:{id:digest(token),ownerId:id,expiresAt:new Date(Date.now()+30*60_000)}});invitation=true;details={email};
     }else if(body.action==='disable'||body.action==='activate'){
-      const target=await tx.ownerIdentity.findUnique({where:{id},include:{credentials:{select:{id:true}}}});if(!target)throw new OwnerError('Owner not found.',404);
-      if(body.action==='disable'&&target.active&&target.credentials.length){const active=await tx.ownerIdentity.count({where:{active:true,credentials:{some:{}}}});if(active<=1)throw new OwnerError('The last active owner cannot be disabled.',409);}
+      const target=await tx.ownerIdentity.findUnique({where:{id}});if(!target)throw new OwnerError('Owner not found.',404);
+      if(body.action==='disable'&&target.active&&target.passwordHash){const active=await tx.ownerIdentity.count({where:{active:true,passwordHash:{not:null}}});if(active<=1)throw new OwnerError('The last active owner cannot be disabled.',409);}
       await tx.ownerIdentity.update({where:{id},data:{active:body.action==='activate'}});
       await tx.ownerSession.updateMany({where:{ownerId:id,revokedAt:null},data:{revokedAt:new Date()}});details={active:body.action==='activate'};
-    }else if(body.action==='remove-key'){
-      const key=await tx.ownerCredential.findFirst({where:{id:String(body.keyId),ownerId:owner.id}});if(!key)throw new OwnerError('Key unavailable.',404);
-      if(await tx.ownerCredential.count({where:{ownerId:owner.id}})<=1)throw new OwnerError('Register a spare key before removing this one.',409);
-      await tx.ownerCredential.delete({where:{id:key.id}});await tx.ownerSession.updateMany({where:{ownerId:owner.id,revokedAt:null},data:{revokedAt:new Date()}});id=owner.id;details={label:key.label};
     }else if(body.action==='revoke-session'){
       const target=await tx.ownerSession.findUnique({where:{id}});if(!target)throw new OwnerError('Session unavailable.',404);
       await tx.ownerSession.update({where:{id},data:{revokedAt:new Date()}});details={ownerId:target.ownerId};
@@ -31,5 +27,5 @@ export const POST=ownerRoute(async(req,owner)=>{
     await tx.ownerAudit.create({data:{actorId:owner.id,actorName:owner.name,action:`OWNER_${body.action.toUpperCase()}`,entityId:id,details:JSON.parse(JSON.stringify(details))}});
     return {invitation};
   });
-  return NextResponse.json({message:result.invitation?`One-time enrollment token (expires in 30 minutes): ${token}`:'Owner access updated. Removing a key revokes existing owner sessions.'});
+  return NextResponse.json({message:result.invitation?`One-time password setup code (expires in 30 minutes): ${token}`:'Owner access updated.'});
 });

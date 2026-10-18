@@ -6,7 +6,7 @@ export class StaffError extends Error { constructor(message:string,public status
 export function staffRoute(permission:Permission|undefined, handler:(req:NextRequest,staff:NonNullable<Awaited<ReturnType<typeof currentStaff>>>)=>Promise<Response>) {
   return async(req:NextRequest)=> {
     try {
-      if(!['GET','HEAD'].includes(req.method)&&!await currentOwner(true)) throw new StaffError('Confirm your identity with a passkey before this action.',401);
+      if(!['GET','HEAD'].includes(req.method)&&!await currentOwner(true)) throw new StaffError('Confirm your password in Security & sessions before this action.',401);
       if(!["GET","HEAD"].includes(req.method) && req.headers.get("origin")!==req.nextUrl.origin) throw new StaffError("This request is not allowed.",403);
       const staff=await currentStaff(); if(!staff) throw new StaffError("Please sign in.",401);
       const {hasPermission}=await import('./staff-policy');

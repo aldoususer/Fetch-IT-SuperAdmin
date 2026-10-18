@@ -21,5 +21,5 @@ const db=new PrismaClient({datasourceUrl:process.env.OWNER_MAINTENANCE_DATABASE_
     await tx.ownerInvitation.create({data:{id:createHash('sha256').update(token).digest('hex'),ownerId:owner.id,expiresAt:new Date(Date.now()+30*60_000)}});
     await tx.ownerAudit.create({data:{actorId:owner.id,actorName:owner.name,action:mode==='create'?'OWNER_BOOTSTRAPPED':'OWNER_RECOVERY_ISSUED',entityId:owner.id,details:{method:'Authorized local maintenance',existingKeysPreserved:true}}});
   });
-  console.log('One-time enrollment token (expires in 30 minutes). Enter it on /enroll; do not paste it into chat or commit it:');console.log(token);
+  console.log('One-time password setup code (expires in 30 minutes). Enter it on /enroll; do not paste it into chat or commit it:');console.log(token);
 })().catch(error=>{console.error(error.message);process.exitCode=1;}).finally(()=>db.$disconnect());

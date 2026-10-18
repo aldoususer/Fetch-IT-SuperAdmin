@@ -160,6 +160,8 @@ model OwnerIdentity {
   name        String
   email       String            @unique
   active      Boolean           @default(true)
+  passwordHash String?
+  passwordChangedAt DateTime?
   createdAt   DateTime          @default(now())
   actor       User              @relation(fields: [actorId], references: [id])
   credentials OwnerCredential[]
