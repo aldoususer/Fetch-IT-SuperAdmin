@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentAdmin } from "@/lib/admin-access";
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+import { withRequestLog } from "@/lib/request-guard";
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await currentAdmin();
     if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,3 +23,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return result ? NextResponse.json({ user: result }) : NextResponse.json({ error: "The account was already changed. Refresh and try again." }, { status: 409 });
   } catch { return NextResponse.json({ error: "Couldn’t update the account. Please retry." }, { status: 503 }); }
 }
+
+export const PATCH = withRequestLog("admin:users/[id]:PATCH", handlePATCH);

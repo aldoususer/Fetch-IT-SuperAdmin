@@ -92,7 +92,7 @@ export async function recordDemoPayout(db: PrismaClient, id: string, actor: Acto
       throw new PaymentError("A payout is already recorded.", 409);
     }
     const updated = await tx.booking.update({ where: { id }, data: { demoPayoutAt: new Date(), demoPayoutReference: reference } });
-    await tx.paymentEvent.create({ data: { bookingId: id, actorId: actor.uid, actorName: actor.name, actorRole: "ADMIN", action: "DEMO_PAYOUT_RECORDED", amount: booking.demoRiderEarnings, fromStatus: "PAID", toStatus: "PAID", reason, reference } });
+    await tx.paymentEvent.create({ data: { bookingId: id, actorId: actor.uid, actorName: actor.name, actorRole: actor.role, action: "DEMO_PAYOUT_RECORDED", amount: booking.demoRiderEarnings, fromStatus: "PAID", toStatus: "PAID", reason, reference } });
     await tx.adminAudit.create({ data: { actorId: actor.uid, actorName: actor.name, action: "DEMO_PAYOUT_RECORDED", entityType: "BOOKING", entityId: id, details: { riderId: booking.riderId, amount: booking.demoRiderEarnings.toString(), reference, reason, simulated: true } } });
     return updated;
   }, { maxWait: 10000, timeout: 20000 });

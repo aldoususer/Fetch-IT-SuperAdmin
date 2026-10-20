@@ -64,7 +64,7 @@ export async function reviewPayment(db: PrismaClient, id: string, actor: Actor, 
       ...(isDemoPayment(booking.paymentMethod) && status === "REFUNDED" ? { demoCommission: null, demoRiderEarnings: null } : {}),
       ...(status === "UNPAID" ? { customerPaidAmount: null, riderReceivedAmount: null, customerPaidAt: null, riderReceivedAt: null } : {}),
     } });
-    await tx.paymentEvent.create({ data: { bookingId: id, actorId: actor.uid, actorName: actor.name, actorRole: "ADMIN", action: isDemoPayment(booking.paymentMethod) ? "DEMO_REFUND_RECORDED" : "ADMIN_REVIEWED", fromStatus: booking.paymentStatus, toStatus: status, reason, reference } });
+    await tx.paymentEvent.create({ data: { bookingId: id, actorId: actor.uid, actorName: actor.name, actorRole: actor.role, action: isDemoPayment(booking.paymentMethod) ? "DEMO_REFUND_RECORDED" : "ADMIN_REVIEWED", fromStatus: booking.paymentStatus, toStatus: status, reason, reference } });
     await tx.adminAudit.create({ data: { actorId: actor.uid, actorName: actor.name, action: "PAYMENT_UPDATED", entityType: "BOOKING", entityId: id, details: { fromStatus: booking.paymentStatus, status, reason, reference } } });
     return updated;
   }, { maxWait: 10000, timeout: 20000 });
