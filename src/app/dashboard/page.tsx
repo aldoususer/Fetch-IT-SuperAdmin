@@ -1,3 +1,4 @@
+import { DemoActivityNotice, RiderApplicationSummary } from "@/components/overview-onboarding";
 import { db } from "@/lib/db";
 import { requireAdminPage } from "@/lib/admin-access";
 import { awaitingSupportReply } from "@/lib/support-queue";
@@ -109,6 +110,7 @@ export default async function OverviewPage() {
   return (
     <div>
       <div className="page-heading"><div><div className="eyebrow">OPERATIONS OVERVIEW</div><h1>Your daily overview</h1><p className="muted small">Keep bookings moving and customers informed.</p></div><p className="muted small">As of {now.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p></div>
+      <DemoActivityNotice/>
       <section className="card attention-panel" aria-labelledby="attention-title"><h2 id="attention-title">Needs attention</h2><p className="muted small">Review these queues before moving on to the numbers.</p><div className="attention-grid">
         <Link href="/dashboard/bookings?attention=unassigned" className="attention-item"><strong>{unassigned}</strong><span>Waiting for a rider →</span><small>Unassigned for over 5 minutes. Future scheduled bookings excluded.</small></Link>
         <Link href="/dashboard/bookings?attention=stalled" className="attention-item"><strong>{stalled}</strong><span>Check booking progress →</span><small>Assigned bookings with no record update for 30 minutes.</small></Link>
@@ -130,6 +132,7 @@ export default async function OverviewPage() {
         statusBreakdown={chartData.statusBreakdown}
         vehicleBreakdown={chartData.vehicleBreakdown}
       />
+      <RiderApplicationSummary/>
     </div>
   );
 }
