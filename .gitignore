@@ -5,3 +5,9 @@ node_modules/
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+# Keep localhost lab source; test data remains ignored.
+!src/lib/local-demo-runtime.ts
+!src/lib/local-demo-files.ts
+!src/lib/local-rider-demo.ts
+!tests/local-demo.test.cjs
