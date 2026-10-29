@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server';
 import {ownerRoute,OwnerError} from '@/lib/owner-http';
 import {db} from '@/lib/db';
 import {hashPassword} from '@/lib/password';
-import {isStaffRole} from '@/lib/staff-policy';
+import {isStaffRole,isManagedStaffRole} from '@/lib/staff-policy';
 export const POST=ownerRoute(async(req,owner)=>{
   const body=await req.json();const reason=typeof body.reason==='string'?body.reason.trim():'';
   if(!reason||reason.length>500)throw new OwnerError('Provide a reason of up to 500 characters.');
@@ -14,7 +14,7 @@ export const POST=ownerRoute(async(req,owner)=>{
       const user=await tx.user.create({data:{name:body.name.trim(),email,role:body.role,authIdentities:{create:{provider:'PASSWORD',providerUserId:email,passwordHash:hashPassword(body.password)}}}});id=user.id;after={role:user.role,email};
     }else{
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${id} FOR UPDATE`;
-      const target=await tx.user.findUnique({where:{id}});if(!target||!isStaffRole(target.role))throw new OwnerError('Staff account not found.',404);
+      const target=await tx.user.findUnique({where:{id}});if(!target||!isManagedStaffRole(target.role))throw new OwnerError('Staff account not found.',404);
       before={role:target.role,disabled:target.isBanned};
       if(body.action==='role'){
         if(!isStaffRole(body.role))throw new OwnerError('Choose a staff role.');await tx.user.update({where:{id},data:{role:body.role,authInvalidBefore:new Date()}});after={role:body.role};

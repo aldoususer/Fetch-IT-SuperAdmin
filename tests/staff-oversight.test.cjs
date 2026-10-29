@@ -34,7 +34,7 @@ test('Unknown permissions and unrecognized roles are denied',()=>{
   assert.equal(policy.hasPermission('unknown','operations'),false);
 });
 test('Lower staff roles retain their task boundaries',()=>{
-  for(const [role,allowed]of Object.entries({SUPPORT:['support'],FINANCE:['finance'],SAFETY:['safety'],SUPPORT_SUPERVISOR:['support','support.manage','resources.edit'],ADMIN:permissions})) {
+  for(const [role,allowed]of Object.entries({SUPPORT:['support'],FINANCE:[],SAFETY:['safety'],SUPPORT_SUPERVISOR:['support','support.manage','resources.edit'],ADMIN:permissions})) {
     for(const permission of permissions)assert.equal(policy.hasPermission(role,permission),allowed.includes(permission),`${role}: ${permission}`);
   }
   assert.deepEqual(JSON.parse(JSON.stringify(policy.supportScope({id:'support',role:'SUPERADMIN'}))),{});
@@ -44,7 +44,7 @@ test('Lower staff roles retain their task boundaries',()=>{
 
 function fixture({signedIn=true,fresh=true}={}) {
   const audits=[],messages=[],notes=[],freshChecks=[];
-  const record={id:'case',kind:'SAFETY',status:'AWAITING_ADMIN',priority:'HIGH',assignedToId:'reviewer',createdById:'other-admin',recommendation:'Review the restriction',decision:null,decidedById:null,version:1};
+  const record={id:'case',kind:'SAFETY',status:'AWAITING_ADMIN',assignedToId:'reviewer',createdById:'other-admin',recommendation:'Review the restriction',decision:null,decidedById:null,version:1};
   const ticket={id:'ticket',status:'RESOLVED',priority:'NORMAL',assignedAdminId:'support-a',lastCustomerMessageAt:new Date('2026-10-01'),lastAdminReplyAt:new Date('2026-10-02'),updatedAt:new Date('2026-10-03'),messages:[]};
   const db={
     async $queryRaw(){return [];},
@@ -70,7 +70,7 @@ function fixture({signedIn=true,fresh=true}={}) {
     }
   };
 }
-const supportBody={status:'OPEN',priority:'HIGH',assignedAdminId:'support-b',reply:'',updatedAt:'2026-10-03T00:00:00.000Z',reason:'Reopen and send to the correct reviewer'};
+const supportBody={status:'OPEN',assignedAdminId:'support-b',reply:'',updatedAt:'2026-10-03T00:00:00.000Z',reason:'Reopen and send to the correct reviewer'};
 const caseBody={action:'assign',version:1,assignedToId:'reviewer-b',reason:'Independent safety review required'};
 for(const kind of ['support','cases']) {
   const body=kind==='support'?supportBody:caseBody;

@@ -4,6 +4,7 @@ import {useRouter} from 'next/navigation';
 
 type Mode = 'login' | 'setup' | 'confirm' | 'change-password';
 export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
+  const [failed,setFailed]=useState(false);
   const router = useRouter();
   const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -27,8 +28,8 @@ export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
     event.preventDefault();
     if (submitting.current) return;
     const chosen = change ? nextPassword : password;
-    if ((setup || change) && chosen !== repeat) { setMessage('The new passwords do not match.'); return; }
-    submitting.current = true; setBusy(true); setMessage('');
+    if ((setup || change) && chosen !== repeat) { setFailed(true);setMessage('The new passwords do not match.'); return; }
+    submitting.current = true; setBusy(true); setMessage('');setFailed(false);
     try {
       const response = await fetch(mode === 'login' ? '/api/auth/login' : '/api/owner-auth', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: mode, email, password, ...(setup ? {token} : {}), ...(change ? {newPassword: nextPassword} : {})})});
       const data = await response.json();
@@ -37,7 +38,7 @@ export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
       setMessage(data.message || 'Signed in.');
       if (mode !== 'confirm') router.replace('/dashboard');
       router.refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Please try again.'); }
+    } catch (error) { setFailed(true);setMessage(error instanceof Error ? error.message : 'Please try again.'); }
     finally { submitting.current = false; setBusy(false); }
   }}>
     {(mode === 'login' || setup) && <label>Email<input className="input" name="email" type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} maxLength={254} required/></label>}
@@ -45,7 +46,7 @@ export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
     <label>{setup ? 'New password' : mode === 'login' ? 'Password' : 'Current password'}<input className="input" name="password" type="password" autoComplete={setup ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} minLength={setup ? 15 : undefined} maxLength={128} required/></label>
     {change && <label>New password<input className="input" name="newPassword" type="password" autoComplete="new-password" value={nextPassword} onChange={e => setNextPassword(e.target.value)} minLength={15} maxLength={128} required/></label>}
     {(setup || change) && <><label>Confirm new password<input className="input" name="repeat" type="password" autoComplete="new-password" value={repeat} onChange={e => setRepeat(e.target.value)} minLength={15} maxLength={128} required/></label><p className="muted small">Use 15–128 characters. A unique passphrase works well.</p></>}
-    {message && <p role="status">{message}</p>}
+    {message && <p role={failed?"alert":"status"} className={failed?"error-message":"success-message"}>{message}</p>}
     <button className="btn btn-primary" disabled={busy}>{busy ? 'Please wait…' : setup ? 'Save password & sign in' : change ? 'Change password' : mode === 'confirm' ? 'Confirm password' : 'Sign in'}</button>
   </form>;
 }
