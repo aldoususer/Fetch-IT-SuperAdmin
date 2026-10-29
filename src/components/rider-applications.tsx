@@ -1,4 +1,5 @@
 "use client";
+import { APPLICATION_STATUS_FILTERS, normalizeApplicationFilter } from "@/lib/application-queue";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { SECTION_FIELDS, FIELD_LABELS, DOCUMENT_LABELS, type Fields, type Review } from "@/lib/rider-application-policy";
@@ -11,28 +12,53 @@ type Application = { isDemo: boolean; id: string; version: number; status: strin
 type State = { application?: Application; applications?: Application[]; nextCursor?: string; actor?: { id: string; canActivate: boolean }; approvals?: { service: string; vehicleClass: string; source: string; revokedAt?: string; validUntil?: string }[] };
 const label = (s: string) => s === "DEMO_COMPLETED" ? "Awaiting service activation" : s.replaceAll("_", " ").toLowerCase().replace(/^./, c => c.toUpperCase());
 const stamp = (date?: string) => date ? new Date(date).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) + " PHT" : "Not scheduled";
-export function RiderApplications({ id }: { id?: string }) {
+export function RiderApplications({ id, initialStatus = "" }: { id?: string; initialStatus?: string }) {
   const lab = useLocalDemo();
   const mutationVersion = useRef(0);
+  const requestSequence = useRef(0);
   const [data, setData] = useState<State>({}), [error, setError] = useState(""), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
-  const [applicationMode, setApplicationMode] = useState('');
-  const [query, setQuery] = useState(""), [filter, setFilter] = useState(""), [cursor, setCursor] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [query, setQuery] = useState(""), [filter, setFilter] = useState(() => normalizeApplicationFilter(initialStatus)), [cursor, setCursor] = useState("");
   const [schedule, setSchedule] = useState({ date: "", venue: "", instructions: "Bring your original documents and the vehicle named in your application. Arrive 15 minutes before the schedule." });
   const [zone, setZone] = useState(""), [preview, setPreview] = useState(""), [attended, setAttended] = useState(false), [passed, setPassed] = useState(false), [notes, setNotes] = useState(""), [services, setServices] = useState<string[]>([]);
   const endpoint = `/api/rider-applications${id ? "/" + encodeURIComponent(id) : ""}`;
+  const requestKey = id ? endpoint : endpoint + '?' + new URLSearchParams({ q: query, status: filter, cursor });
+  const resetQueue = useCallback((next: { status?: string; query?: string; cursor?: string }) => {
+    requestSequence.current++;
+    setCursor(next.cursor ?? '');
+    if(next.status !== undefined)setFilter(next.status);
+    if(next.query !== undefined)setQuery(next.query);
+    setData(previous => ({ ...previous, applications: undefined, nextCursor: undefined }));
+    setError('');setLoading(true);
+  }, []);
   const load = useCallback(async (background = false, signal?: AbortSignal) => {
+    const sequence = ++requestSequence.current;
     const startedAtVersion = mutationVersion.current;
-    if (!background) { setLoading(true); setError(""); }
+    const current = () => !signal?.aborted && requestSequence.current === sequence && mutationVersion.current === startedAtVersion;
+    if (!background) { setLoading(true); setError(''); }
     try {
-      const r = await fetch(id ? endpoint : `${endpoint}?${new URLSearchParams({ q: query, status: filter, cursor, mode: applicationMode })}`, { cache: "no-store", signal }); const value = await r.json();
-      if (signal?.aborted || mutationVersion.current !== startedAtVersion) return;
-      if (!r.ok) throw new Error(value.error || "Could not load applications."); setData(value);
-    } catch (e) { if (!signal?.aborted && !background) setError(e instanceof Error ? e.message : "Could not load applications."); } finally { if (!background) setLoading(false); }
-  }, [id, endpoint, query, filter, cursor, applicationMode]);
-  // Synchronize the queue with the current route, search and status filters.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, [load]);
-  useVisiblePoll(!busy ? endpoint : '', signal => load(true, signal), 10000, false);
+      const response = await fetch(requestKey, { cache: 'no-store', signal });
+      const value = await response.json();
+      if (!current()) return;
+      if (!response.ok) throw new Error(value.error || 'Could not load applications.');
+      setError('');setData(value);
+    } catch (error) {
+      if (current() && !background) setError(error instanceof Error ? error.message : 'Could not load applications.');
+    } finally {
+      if (current()) setLoading(false);
+    }
+  }, [requestKey]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(false, controller.signal);
+    return () => controller.abort();
+  }, [load]);
+  useEffect(() => {
+    if (id || searchText.trim() === query) return;
+    const timer = setTimeout(() => resetQueue({ query: searchText.trim() }), 250);
+    return () => clearTimeout(timer);
+  }, [id, searchText, query, resetQueue]);
+  useVisiblePoll(!busy && !loading ? requestKey : '', signal => load(true, signal), 10000, false);
   async function action(body: Record<string, unknown>) {
     mutationVersion.current++;
     setBusy(true); setError("");
@@ -54,11 +80,11 @@ export function RiderApplications({ id }: { id?: string }) {
     } catch (e) { setError(e instanceof Error ? e.message : "PDF preview unavailable."); } finally { setBusy(false); }
   }
   if (!id) return <section className="oa">{lab.enabled && <aside className="oa-card" style={{ borderColor: '#c87338' }}><strong>LOCAL DEMO LAB</strong><p>Live connection to the isolated Rider test data. To return an application, mark an item Needs correction, give a reason, then request corrections. Emails are captured locally.</p><a href={lab.riderUrl} target="_blank" rel="noreferrer">Open connected Rider ↗</a> · <Link href="/login">Switch demo staff</Link></aside>}<div className="oa-heading"><div><p className="oa-eyebrow">RIDER ONBOARDING</p><h1>Applications</h1><p>Review details, request specific corrections, and prepare riders for their first booking.</p></div><button onClick={() => void load()} disabled={loading}>Refresh</button></div>
-    <form className="oa-toolbar" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); setCursor(""); setQuery(String(f.get("q"))); setFilter(String(f.get("status"))); setApplicationMode(String(f.get("mode"))); }}><input name="q" aria-label="Search applicants" placeholder="Search name or email" defaultValue={query}/><select name="status" aria-label="Application status" defaultValue={filter}><option value="">All statuses</option>{["DRAFT", "SUBMITTED", "IN_REVIEW", "NEEDS_CORRECTION", "RECOMMENDED", "ORIENTATION_SCHEDULED", "ASSESSED", "ACTIVE", "DEMO_COMPLETED"].map(s => <option key={s} value={s}>{label(s)}</option>)}</select><select name="mode" aria-label="Application type" defaultValue={applicationMode}><option value="">All application types</option><option value="real">Manually entered</option><option value="demo">Autofilled</option></select><button>Search</button></form>
+    <form className="oa-toolbar" aria-label="Filter rider applications" onSubmit={event => { event.preventDefault(); if (searchText.trim() === query && !cursor) void load(); else resetQueue({ query: searchText.trim() }); }}><input name="q" type="search" aria-label="Search applicants" placeholder="Search name or email" value={searchText} onChange={event => setSearchText(event.target.value)}/><select name="status" aria-label="Application status" value={filter} onChange={event => resetQueue({ status: event.target.value, query: searchText.trim() })}><option value="">All statuses</option>{APPLICATION_STATUS_FILTERS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></form>
     {error && <p role="alert" className="oa-error">{error}</p>}{loading && <p role="status">Loading applications…</p>}
-    <div className="oa-list">{data.applications?.map(a => <Link className="oa-card oa-row" href={`/dashboard/applications/${a.id}`} key={a.id}><div><strong>{a.user.name}</strong>{a.isDemo && <span className="oa-badge" title="Generated details were used to fill this application">Autofilled</span>}<p>{a.user.email}</p><small>{label(a.vehicleClass)} · {a.services.map(label).join(" / ")}</small></div><span className="oa-badge">{label(a.status)} →</span></Link>)}</div>
-    {!loading && !data.applications?.length && <div className="oa-card">No matching applications. New applicants appear here after starting their application.</div>}
-    <div className="oa-toolbar">{cursor && <button onClick={() => setCursor("")}>Back to first page</button>}{data.nextCursor && <button onClick={() => setCursor(data.nextCursor!)}>Next page</button>}</div></section>;
+    <div className="oa-list" aria-busy={loading}>{!loading && !error && data.applications?.map(a => <Link className="oa-card oa-row" href={`/dashboard/applications/${a.id}`} key={a.id}><div><strong>{a.user.name}</strong>{a.isDemo && <span className="oa-badge" title="Generated details were used to fill this application">Autofilled</span>}<p>{a.user.email}</p><small>{label(a.vehicleClass)} · {a.services.map(label).join(" / ")}</small></div><span className="oa-badge">{label(a.status)} →</span></Link>)}</div>
+    {!loading && !error && !data.applications?.length && <div className="oa-card">No matching applications. New applicants appear here after starting their application.</div>}
+    <div className="oa-toolbar">{!loading && !error && cursor && <button onClick={() => resetQueue({ cursor: "" })}>Back to first page</button>}{!loading && !error && data.nextCursor && <button onClick={() => resetQueue({ cursor: data.nextCursor })}>Next page</button>}</div></section>;
   if (!app) return <section className="oa"><Link href="/dashboard/applications">← Applications</Link><p role={error ? "alert" : "status"}>{error || "Loading application…"}</p><button onClick={() => void load()}>Retry</button></section>;
   const activeService = (service: string) => data.approvals?.some(a => a.service === service && a.vehicleClass === app.vehicleClass && a.source === "APPLICATION" && !a.revokedAt && (!a.validUntil || new Date(a.validUntil) > new Date()));
   const reviewable = ["SUBMITTED", "IN_REVIEW"].includes(app.status);

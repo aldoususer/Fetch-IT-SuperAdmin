@@ -7,12 +7,13 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 export type Permission = "operations" | "support" | "support.manage" | "finance" | "safety" | "resources.edit";
 const grants: Record<string, readonly Permission[]> = {
+  SUPERADMIN: ["operations", "support", "support.manage", "finance", "safety", "resources.edit"],
   ADMIN: ["operations", "support", "support.manage", "finance", "safety", "resources.edit"],
   SUPPORT: ["support"], SUPPORT_SUPERVISOR: ["support", "support.manage", "resources.edit"],
   FINANCE: ["finance"], SAFETY: ["safety"],
 };
 export function hasPermission(role: string, permission: Permission) {
-  return role === "SUPERADMIN" || !!grants[role]?.includes(permission);
+  return !!grants[role]?.includes(permission);
 }
 export function isStaffRole(role: unknown): role is StaffRole {
   return typeof role === "string" && (STAFF_ROLES as readonly string[]).includes(role);

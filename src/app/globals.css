@@ -131,6 +131,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--orange); outlin
 .admin-brand img { object-fit: contain; }
 .admin-brand small { display: block; margin-top: 3px; font-size: 9px; color: var(--text-muted); letter-spacing: 2px; }
 .admin-sidebar nav { display: grid; gap: 7px; }
+.sidebar-group { display: grid; gap: 4px; }
+.sidebar-group + .sidebar-group { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 18px; }
+.sidebar-group-heading { padding: 0 14px; margin: 0 0 6px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .6px; }
+.staff-oversight { display: grid; gap: 20px; }
+.staff-oversight > .page-heading { margin-bottom: 0; }
+.staff-oversight .stat-grid strong { font-size: 24px; }
 .sidebar-link { padding: 12px 14px; }
 .sidebar-link > span { width: 20px; font-size: 19px; text-align: center; }
 .sidebar-account { margin-top: auto; border-top: 1px solid var(--border); padding: 20px 8px 0; font-size: 13px; }

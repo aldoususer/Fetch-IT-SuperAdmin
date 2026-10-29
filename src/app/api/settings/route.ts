@@ -1,9 +1,9 @@
 import {NextResponse} from 'next/server';
 import {ownerRoute,OwnerError} from '@/lib/owner-http';
 import {db} from '@/lib/db';
-import {validatePlatformSettings} from '@/lib/platform-policy';
+import {validateSettingsUpdate} from '@/lib/settings-limits';
 export const POST=ownerRoute(async(req,owner)=>{
-  const body=await req.json();let settings;try{settings=validatePlatformSettings(body.settings);}catch(error){throw new OwnerError(error instanceof Error?error.message:'Invalid settings.');}
+  const body=await req.json();let settings;try{settings=validateSettingsUpdate(body.settings);}catch(error){throw new OwnerError(error instanceof Error?error.message:'Invalid settings.');}
   const reason=typeof body.reason==='string'?body.reason.trim():'';if(!reason||reason.length>500)throw new OwnerError('Provide a change reason of up to 500 characters.');
   await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('fetch-platform-settings'))`;

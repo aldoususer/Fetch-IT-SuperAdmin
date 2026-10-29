@@ -2,10 +2,12 @@ import {NextRequest,NextResponse} from 'next/server';
 import {db} from '@/lib/db';
 import {staffRoute,StaffError,text} from '@/lib/staff-http';
 import {caseScope,hasPermission} from '@/lib/staff-policy';
+import {interventionReason} from '@/lib/owner-intervention';
 export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}>}) {
   const {id}=await params;
   return staffRoute(undefined,async(request,staff)=>{
     const body=await request.json();
+    const reason=interventionReason(body.reason);
     const result=await db.$transaction(async tx=>{
       await tx.$queryRaw`SELECT "id" FROM "WorkflowCase" WHERE "id"=${id} FOR UPDATE`;
       const record=await tx.workflowCase.findFirst({where:{id,...caseScope(staff)}});
@@ -40,7 +42,8 @@ export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}
         await tx.workflowNote.create({data:{caseId:id,authorId:staff.id,authorName:staff.name,body:`Resolution: ${text(body.reason,4000)}`}});data={...data,status:'RESOLVED'};
       } else throw new StaffError('You cannot perform this action.',403);
       const updated=await tx.workflowCase.update({where:{id},data});
-      await tx.adminAudit.create({data:{actorId:staff.id,actorName:staff.name,action:`CASE_${String(body.action).toUpperCase()}`,entityType:'CASE',entityId:id,details:{from:record.status,to:updated.status,assignedToId:updated.assignedToId}}});return updated;
+      const snapshot=(value:typeof record)=>({status:value.status,assignedToId:value.assignedToId,recommendation:value.recommendation,decision:value.decision,decidedById:value.decidedById,version:value.version});
+      await tx.adminAudit.create({data:{actorId:staff.id,actorName:staff.name,action:`CASE_${String(body.action).toUpperCase()}`,entityType:'CASE',entityId:id,details:{actorRole:staff.role,reason,from:record.status,to:updated.status,assignedToId:updated.assignedToId,before:snapshot(record),after:snapshot(updated)}}});return updated;
     });
     return NextResponse.json({message:result.status==='APPROVED'?'Recommendation approved. Perform any permitted intervention on the booking/account page, then record the resolution.':'Case updated.'});
   })(req);

@@ -30,6 +30,6 @@ export async function RiderApplicationSummary() {
         <span>{label}</span><div aria-hidden="true" style={{ height: 10, background: '#edf1ea', borderRadius: 10, overflow: 'hidden' }}><div style={{ height: '100%', width: `${count / max * 100}%`, background: status === 'NEEDS_CORRECTION' ? '#cf8a35' : '#b94c24', borderRadius: 10 }}/></div><strong style={{ textAlign: 'right' }}>{count}</strong>
       </li>;
     })}</ul> : <p className="muted small">New applications will appear here when riders start their application.</p>}
-    <p className="muted small" style={{ margin: '18px 0 0' }}>{demoCount} labeled demo applications included. Filter “For demo” in Applications to review them separately. Demo completion grants no real rider service access.</p>
+    <p className="muted small" style={{ margin: '18px 0 0' }}>{demoCount} labeled demo applications included. Autofilled applications are labeled in the application list and follow the same review and activation rules.</p>
   </section>;
 }
