@@ -1,3 +1,4 @@
+import { expireRiderOffers } from "@/lib/dispatch";
 import { DemoActivityNotice, RiderApplicationSummary } from "@/components/overview-onboarding";
 import { db } from "@/lib/db";
 import { requireAdminPage } from "@/lib/admin-access";
@@ -100,6 +101,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 export default async function OverviewPage() {
   await requireAdminPage();
+  await expireRiderOffers(db);
   const now = new Date();
   const [stats, chartData, unassigned, stalled, support] = await Promise.all([getStats(), getChartData(),
     db.booking.count({ where: bookingWhere({ attention: "unassigned" }, now) }),

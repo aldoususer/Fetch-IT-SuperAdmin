@@ -1,3 +1,4 @@
+import { expireRiderOffers } from "@/lib/dispatch";
 import { PAYMENT_METHOD_LABEL } from "@/lib/payment-policy";
 import { PAYMENT_STATUS_LABEL } from "@/lib/payment-policy";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { StatusBadge } from "../status-badge";
 
 export default async function BookingsPage({ searchParams }: { searchParams: Promise<BookingFilters> }) {
   await requireAdminPage();
+  await expireRiderOffers(db);
   const filters = normalizeFilters(await searchParams);
   let error = "";
   let where;
