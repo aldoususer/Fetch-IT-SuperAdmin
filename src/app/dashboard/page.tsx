@@ -111,12 +111,12 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <div className="page-heading"><div><div className="eyebrow">OPERATIONS OVERVIEW</div><h1>Your daily overview</h1><p className="muted small">Keep bookings moving and customers informed.</p></div><p className="muted small">As of {now.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p></div>
-      <DemoActivityNotice/>
+      <div className="page-heading"><div><div className="eyebrow">SUPERADMIN OVERVIEW</div><h1>Platform overview</h1><p className="muted small">Oversee staff access, platform rules, and decisions that need your attention.</p></div><p className="muted small">As of {now.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p></div>
+      <section className="card attention-panel"><h2>Manage the platform</h2><div className="attention-grid"><Link className="attention-item" href="/dashboard/staff"><span>Staff & permissions →</span><small>Review assigned work and control staff access.</small></Link><Link className="attention-item" href="/dashboard/settings"><span>Pricing & rules →</span><small>Review fares, commission, and service availability.</small></Link><Link className="attention-item" href="/dashboard/cases?status=IN_REVIEW"><span>Review decisions →</span><small>Inspect recommendations and independent approvals.</small></Link></div></section><DemoActivityNotice/>
       <section className="card attention-panel" aria-labelledby="attention-title"><h2 id="attention-title">Needs attention</h2><p className="muted small">Review these queues before moving on to the numbers.</p><div className="attention-grid">
         <Link href="/dashboard/bookings?attention=unassigned" className="attention-item"><strong>{unassigned}</strong><span>Waiting for a rider →</span><small>Unassigned for over 5 minutes. Future scheduled bookings excluded.</small></Link>
         <Link href="/dashboard/bookings?attention=stalled" className="attention-item"><strong>{stalled}</strong><span>Check booking progress →</span><small>Assigned bookings with no record update for 30 minutes.</small></Link>
-        <Link href="/dashboard/support?unanswered=1" className="attention-item"><strong>{support}</strong><span>Unanswered requests →</span><small>Open or in-progress requests awaiting an admin reply.</small></Link>
+        <Link href="/dashboard/support?unanswered=1" className="attention-item"><strong>{support}</strong><span>Awaiting staff reply →</span><small>Open or in-review requests awaiting a staff reply.</small></Link>
       </div></section>
       <div className="stat-grid">
         <StatCard label="Total bookings" value={stats.totalBookings} />

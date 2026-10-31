@@ -206,3 +206,8 @@ for (const role of ['CUSTOMER', 'RIDER']) {
     assert.equal(f.row.paymentStatus, 'PAID');
   });
 }
+
+for(const action of ['ban','unban'])test(action+' requires an attributable reason and keeps the audit result readable',async()=>{
+ for(const reason of ['', ' ', 'x'.repeat(501), null]){const f=restrictionFixture({banned:action==='unban'});assert.equal((await f.request(action,{reason})).status,400);assert.equal(f.audits.length,0);}
+ const f=restrictionFixture({banned:action==='unban'});const response=await f.request(action,{reason:'Reviewed local evidence'});assert.equal(response.status,200);assert((await response.json()).message);assert.equal(f.audits[0].details.reason,'Reviewed local evidence');assert.equal(f.audits[0].details.before.isBanned,action==='unban');assert.equal(f.audits[0].details.after.isBanned,action==='ban');
+});

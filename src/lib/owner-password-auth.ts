@@ -84,7 +84,7 @@ export async function ownerPasswordRoute(req: NextRequest, forcedAction?: 'login
       if (action !== 'confirm') await tx.ownerSession.create({data: {id: digest(sessionToken), ownerId: owner.id, expiresAt: new Date(Date.now() + 60 * 60_000)}});
       await tx.ownerAudit.create({data: {actorId: owner.id, actorName: owner.name, action: action === 'confirm' ? 'OWNER_PASSWORD_CONFIRMED' : nextHash ? 'OWNER_PASSWORD_CHANGED' : 'OWNER_PASSWORD_SIGN_IN', entityId: owner.id, details: {method: 'Email and password', sessionsRevoked: !!nextHash}}});
     }, {timeout: 20000});
-    const response = NextResponse.json({ok: true, ...(action !== 'confirm' ? {redirect: '/dashboard'} : {message: 'Password confirmed. You can continue.'})}, {headers: noStore});
+    const response = NextResponse.json({ok: true, ...(action !== 'confirm' ? {redirect: '/dashboard'} : {message: 'Identity verified. You can continue.'})}, {headers: noStore});
     if (action !== 'confirm') response.cookies.set(config.cookie, sessionToken, {httpOnly: true, secure: config.secure, sameSite: 'strict', path: '/', maxAge: 3600});
     return response;
   } catch (error) {

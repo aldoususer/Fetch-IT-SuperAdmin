@@ -1,4 +1,5 @@
 "use client";
+import {useVerifiedRequest} from "@/components/identity-verification";
 import { APPLICATION_STATUS_FILTERS, normalizeApplicationFilter } from "@/lib/application-queue";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ type State = { application?: Application; applications?: Application[]; nextCurs
 const label = (s: string) => s === "DEMO_COMPLETED" ? "Awaiting service activation" : s.replaceAll("_", " ").toLowerCase().replace(/^./, c => c.toUpperCase());
 const stamp = (date?: string) => date ? new Date(date).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) + " PHT" : "Not scheduled";
 export function RiderApplications({ id, initialStatus = "" }: { id?: string; initialStatus?: string }) {
+  const verifiedRequest=useVerifiedRequest();
   const lab = useLocalDemo();
   const mutationVersion = useRef(0);
   const requestSequence = useRef(0);
@@ -64,7 +66,7 @@ export function RiderApplications({ id, initialStatus = "" }: { id?: string; ini
     mutationVersion.current++;
     setBusy(true); setError(""); setFeedback("");
     try {
-      const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: data.application?.version, ...body }) }); const result = await r.json();
+      const r = await verifiedRequest(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: data.application?.version, ...body }) }); const result = await r.json();
       if (!r.ok) throw new Error(result.error || "Could not save this review.");
       if (body.action === "preview") setPreview(result.text); else { if (body.action === "activate") setServices([]); setData(previous => ({ ...previous, ...result })); }
       if (body.action !== "preview") setFeedback(typeof result.message === "string" ? result.message : ({review:"Review decision saved.",claim:"Application assigned to you.",corrections:"Correction request saved. Check email history for delivery status.",schedule:"Orientation saved. Check email history for invitation delivery.",activate:"Service access updated.",assessment:"Assessment saved.",recommend:"Recommendation submitted.",reject:"Rejection recorded."} as Record<string,string>)[String(body.action)] || "Change saved successfully.");
@@ -76,7 +78,7 @@ export function RiderApplications({ id, initialStatus = "" }: { id?: string; ini
   async function previewPdf() {
     setBusy(true); setError(""); setFeedback("");
     try {
-      const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "preview", pdf: true, ...orientation() }) });
+      const r = await verifiedRequest(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "preview", pdf: true, ...orientation() }) });
       if (!r.ok) throw new Error((await r.json()).error || "PDF preview unavailable.");
       const url = URL.createObjectURL(await r.blob()), a = document.createElement("a"); a.href = url; a.download = "Fetch-It-Orientation-Preview.pdf"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch (e) { setError(e instanceof Error ? e.message : "PDF preview unavailable."); } finally { setBusy(false); }

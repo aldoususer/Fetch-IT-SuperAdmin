@@ -1,9 +1,11 @@
 "use client";
+import {useVerifiedRequest} from "@/components/identity-verification";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { REVIEW_PRIORITIES, reviewLabel } from "@/lib/review-queue";
 
 export function SupportHandoff({ ticketId, disabled = false }: { ticketId: string; disabled?: boolean }) {
+  const verifiedRequest=useVerifiedRequest();
   const router = useRouter(), sending = useRef(false);
   const [destination, setDestination] = useState("ESCALATION"), [busy, setBusy] = useState(false), [sent, setSent] = useState(false), [error, setError] = useState("");
   const safety = destination === "SAFETY";
@@ -12,7 +14,7 @@ export function SupportHandoff({ ticketId, disabled = false }: { ticketId: strin
     const form = event.currentTarget, data = new FormData(form);
     sending.current = true; setBusy(true); setSent(false); setError("");
     try {
-      const response = await fetch("/api/cases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticketId, kind: destination, title: data.get("title"), helpReason: data.get("helpReason"), tried: data.get("tried"), priority: data.get("priority") }) });
+      const response = await verifiedRequest("/api/cases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticketId, kind: destination, title: data.get("title"), helpReason: data.get("helpReason"), tried: data.get("tried"), priority: data.get("priority") }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error || "Could not send the request.");
       form.reset(); setSent(true); router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not send the request. Please retry."); }

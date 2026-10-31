@@ -23,7 +23,7 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
       await tx.adminAudit.create({ data: { actorId: admin.id, actorName: admin.name, action: "BOOKING_CANCELLED", entityType: "BOOKING", entityId: id, details: { reason: body.reason.trim() } } });
       return tx.booking.findUnique({ where: { id } });
     }, { maxWait: 10000, timeout: 20000 });
-    return result ? NextResponse.json({ booking: bookingView(result) }) : NextResponse.json({ error: "Booking is completed, cancelled, or no longer available." }, { status: 409 });
+    return result ? NextResponse.json({ booking: bookingView(result), message: `Booking ${result.refCode} cancelled. The reason has been recorded.` }) : NextResponse.json({ error: "Booking is completed, cancelled, or no longer available." }, { status: 409 });
   } catch { return NextResponse.json({ error: "Couldn’t cancel the booking. Please retry." }, { status: 503 }); }
 }
 

@@ -25,5 +25,5 @@ export const POST=ownerRoute(async(req,owner)=>{
       await tx.staffSession.updateMany({where:{userId:id,revokedAt:null},data:{revokedAt:new Date()}});
     }
     await tx.ownerAudit.create({data:{actorId:owner.id,actorName:owner.name,action:`STAFF_${body.action.toUpperCase()}`,entityId:id,details:{before:JSON.parse(JSON.stringify(before)),after:JSON.parse(JSON.stringify(after)),reason}}});return id;
-  });return NextResponse.json({message:'Staff access saved. Existing sessions were revoked where applicable.',id:result});
+  });const messages:Record<string,string>={create:'Staff account created. They can sign in with their email and initial password.',role:'Role changed. This staff member has been signed out on all devices.',disable:'Account disabled. Sign-in is blocked and all sessions have ended.',restore:'Account restored. This staff member can sign in again.',revoke:'Staff member signed out on all devices. Their account remains active.'};return NextResponse.json({message:messages[body.action],id:result,...(body.action==='create'?{redirect:'/dashboard/staff/'+result+'?tab=access'}:{})});
 });

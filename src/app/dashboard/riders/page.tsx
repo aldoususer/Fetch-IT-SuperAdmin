@@ -54,7 +54,7 @@ export default async function RidersPage() {
                     </span>
                   )}
                 </td>
-                <td><BanButton userId={r.id} isBanned={r.isBanned} /></td>
+                <td><BanButton userId={r.id} isBanned={r.isBanned} userName={r.name} userEmail={r.email} /></td>
               </tr>
             ))}
             {riders.length === 0 && (

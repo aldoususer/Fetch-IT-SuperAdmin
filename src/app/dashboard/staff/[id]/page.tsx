@@ -1,3 +1,5 @@
+import {StaffAccessForm} from '@/components/staff-access-form';
+import {eventTitle,phTime} from '@/lib/ux-labels';
 import {ReviewBadge} from "@/components/review-badge";
 import {reviewLabel} from "@/lib/review-queue";
 import Link from 'next/link';
@@ -15,6 +17,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
   const [{id},query]=await Promise.all([params,searchParams]);
   const person=await db.user.findUnique({where:{id},select:{id:true,name:true,email:true,role:true,isBanned:true}});
   if(!person||!isManagedStaffRole(person.role))notFound();
+  const tab=query.tab==='access'?'access':query.tab==='activity'?'activity':'work';
   const ticketsWhere={assignedAdminId:id,status:{not:'RESOLVED' as const}};
   const casesWhere={assignedToId:id,status:{not:'RESOLVED'}};
   const [ticketCount,caseCount,activityCount,sessionCount]=await Promise.all([
@@ -33,16 +36,19 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
   const href=(key:keyof typeof pages,next:number)=>{
     const search=new URLSearchParams();
     for(const name of ['tickets','cases','activity'] as const)search.set(name,String(name===key?next:page(name)));
+    search.set("tab",tab);
     return `/dashboard/staff/${encodeURIComponent(id)}?${search}`;
   };
   const pagination=(key:keyof typeof pages)=><nav className="pagination" aria-label={`${key} pages`}><span className="muted small">Page {page(key)} of {pages[key]}</span>{page(key)>1&&<Link className="btn" href={href(key,page(key)-1)}>Previous</Link>}{page(key)<pages[key]&&<Link className="btn" href={href(key,page(key)+1)}>Next</Link>}</nav>;
   const target=(type:string,recordId:string)=>type==='SUPPORT'?`/dashboard/support/${encodeURIComponent(recordId)}`:type==='CASE'?`/dashboard/cases/${encodeURIComponent(recordId)}`:type==='BOOKING'?`/dashboard/bookings/${encodeURIComponent(recordId)}`:null;
   return <div className="staff-oversight">
-    <Link href="/dashboard/staff">← Staff accounts & assigned work</Link>
-    <div className="page-heading"><div><div className="eyebrow">STAFF OVERSIGHT</div><h1>{person.name}</h1><p>{person.email} · {ROLE_LABELS[person.role]} · {person.isBanned?'Disabled':'Active'}</p><p>Review this person’s assigned work and recorded actions. Interventions use your Superadmin account and require a reason.</p></div><Link className="btn" href={`/dashboard/staff#staff-${encodeURIComponent(id)}`}>Manage this staff member’s access</Link></div>
+    <Link href="/dashboard/staff">← Back to staff</Link>
+    <div className="page-heading"><div><div className="eyebrow">STAFF OVERSIGHT</div><h1>{person.name}</h1><p>{person.email} · {ROLE_LABELS[person.role]} · <span className={'badge '+(person.isBanned?'badge-red':person.role==='FINANCE'?'badge-amber':'badge-green')}>{person.isBanned?'Disabled':person.role==='FINANCE'?'Role retired':'Active'}</span></p><p>Review this person’s assigned work and recorded actions. Interventions use your Superadmin account and require a reason.</p></div></div>
     <div className="stat-grid">{[['Open support requests',ticketCount],['Open review cases',caseCount],['Recorded actions',activityCount],['Active sign-in sessions',sessionCount]].map(([label,count])=><section className="card conversation" key={label}><p className="muted small">{label}</p><strong>{count}</strong></section>)}</div>
-    <section className="card conversation"><h2>Assigned support requests</h2><p>Open a request to read the conversation, reassign it, change its status, or add coaching feedback.</p>{tickets.length?tickets.map(ticket=><p key={ticket.id}><Link href={`/dashboard/support/${ticket.id}`}>{ticket.booking?.refCode??'Account help'} · {ticket.customer.name} · {ticket.category.replaceAll('_',' ')}</Link><br/><span className="muted small"><ReviewBadge value={ticket.status} status /></span></p>):<p className="muted">No open support requests assigned.</p>}{pagination('tickets')}</section>
+    <nav className="section-tabs" aria-label="Staff details">{[['work','Assigned work'],['activity','Activity'],['access','Access settings']].map(([value,label])=><Link key={value} className={'btn '+(tab===value?'btn-primary':'')} href={'?tab='+value} aria-current={tab===value?'page':undefined}>{label}</Link>)}</nav>
+    {tab==='access'&&<StaffAccessForm person={person}/>}
+    <div hidden={tab!=='work'}><section className="card conversation"><h2>Assigned support requests</h2><p>Open a request to read the conversation, reassign it, change its status, or add coaching feedback.</p>{tickets.length?tickets.map(ticket=><p key={ticket.id}><Link href={`/dashboard/support/${ticket.id}`}>{ticket.booking?.refCode??'Account help'} · {ticket.customer.name} · {ticket.category.replaceAll('_',' ')}</Link><br/><span className="muted small"><ReviewBadge value={ticket.status} status /></span></p>):<p className="muted">No open support requests assigned.</p>}{pagination('tickets')}</section>
     <section className="card conversation"><h2>Assigned reviews & escalations</h2><p>Open a case to review evidence, reassign its reviewer, or record an independent decision. Existing approval rules still apply.</p>{cases.length?cases.map(record=><p key={record.id}><Link href={`/dashboard/cases/${record.id}`}>{record.title}</Link><br/><span className="muted small">{reviewLabel(record.kind)} · <ReviewBadge value={record.status} status /> · <ReviewBadge value={record.priority} /></span></p>):<p className="muted">No open review cases assigned.</p>}{pagination('cases')}</section>
-    <section className="card conversation"><h2>Recorded staff activity</h2><p>Actions recorded under this staff member’s own account.</p>{activity.length?activity.map(record=>{const link=target(record.entityType,record.entityId);return <article className="conversation-message" key={record.id}><strong>{record.action.replaceAll('_',' ')}</strong><time dateTime={record.createdAt.toISOString()}>{record.createdAt.toLocaleString('en-PH',{timeZone:'Asia/Manila'})}</time>{link?<Link href={link}>Open related {record.entityType.toLowerCase()} →</Link>:<span>{record.entityType} · {record.entityId}</span>}</article>;}):<p className="muted">No recorded activity yet.</p>}{pagination('activity')}</section>
+    </div><section hidden={tab!=='activity'} className="card conversation"><h2>Recorded staff activity</h2><p>Actions recorded under this staff member’s own account.</p>{activity.length?activity.map(record=>{const link=target(record.entityType,record.entityId);return <article className="conversation-message" key={record.id}><strong>{eventTitle(record.action)}</strong><time dateTime={record.createdAt.toISOString()}>{phTime(record.createdAt)}</time>{link?<Link href={link}>Open related {record.entityType.toLowerCase()} →</Link>:<span>{record.entityType} · {record.entityId}</span>}</article>;}):<p className="muted">No recorded activity yet.</p>}{pagination('activity')}</section>
   </div>;
 }

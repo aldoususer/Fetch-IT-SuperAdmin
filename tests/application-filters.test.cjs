@@ -53,7 +53,7 @@ test('All statuses and legacy direct links keep working; invalid statuses cannot
   assert.equal((await f.get('ACTIVE','SUPPORT')).status,403);assert.equal(f.queries.length,before);
 });
 
-function hooks(){const values=[];let cursor=0;const effects=[];return {effects,react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];},useRef(initial){const slot=cursor++;return values[slot]??={current:initial};},useCallback(fn){return fn;},useEffect(fn){effects.push(fn);}},render(component,props){cursor=0;return component(props);}};}
+function hooks(){const values=[];let cursor=0;const effects=[];return {effects,react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];},useRef(initial){const slot=cursor++;return values[slot]??={current:initial};},useCallback(fn){return fn;},useContext(){return (url,init)=>fetch(url,init);},useEffect(fn){effects.push(fn);}},render(component,props){cursor=0;return component(props);}};}
 function elements(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(elements);return [tree,...elements(tree.props?.children)];}
 const tick=()=>new Promise(setImmediate);
 function client(directory=root,initialStatus='') {

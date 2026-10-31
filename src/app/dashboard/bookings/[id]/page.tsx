@@ -132,7 +132,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
       <BookingControls key={booking.updatedAt.toISOString()} id={booking.id} status={booking.status} paymentStatus={booking.paymentStatus} reference={booking.paymentReference} canAssign={canAssign} riders={riders} demo={demo} canPayout={demo && booking.status === "DELIVERED" && booking.paymentStatus === "PAID" && booking.demoRiderEarnings !== null && !booking.demoPayoutAt} payoutRecorded={!!booking.demoPayoutAt} />
       <section className="card" style={{ padding: 20, marginTop: 20 }}><h2>Payment history</h2>{booking.paymentEvents.map(event => <div className="detail-row" key={event.id}><span>{event.createdAt.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</span><span>{event.actorName} · {event.action.replaceAll("_", " ")} · {PAYMENT_STATUS_LABEL[event.toStatus]}{event.amount ? ` · ₱${event.amount.toFixed(2)}` : ""}{event.reason ? ` · ${event.reason}` : ""}{event.reference ? ` · ${event.reference}` : ""}</span></div>)}{!booking.paymentEvents.length && <p className="muted small">No payment confirmations yet.</p>}</section>
       <div style={{ marginTop: 20 }}>
-        <CancelButton bookingId={booking.id} disabled={isFinal} />
+        <CancelButton bookingId={booking.id} disabled={isFinal} reference={booking.refCode} customerName={booking.customer.name} status={booking.status} paymentNote={demo?"A simulated refund is recorded for eligible test online payments; no real money is transferred.":"Check any payment or refund obligations separately."} />
         {isFinal && (
           <span style={{ marginLeft: 10, fontSize: 13, color: "var(--text-muted)" }}>
             This booking is already {booking.status.toLowerCase()}.

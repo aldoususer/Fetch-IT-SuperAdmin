@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Prisma, SupportStatus } from "@prisma/client";
+import { awaitingSupportReply } from "@/lib/support-queue";
 import { db } from "@/lib/db";
 import { requireStaffPage } from "@/lib/staff-access";
 import { caseScope, hasPermission, supportScope } from "@/lib/staff-policy";
@@ -38,15 +39,16 @@ export async function CasesPage({ searchParams }: { searchParams: Promise<Query>
 }
 export async function SupportPage({ searchParams }: { searchParams: Promise<Query> }) {
   const staff = await requireStaffPage("support"), query = await searchParams, filters = readQueue(query, false);
+  const unanswered=query.unanswered==="1";
   const status = (filters.status === "IN_REVIEW" ? "IN_PROGRESS" : filters.status) as SupportStatus;
   const assigned = hasPermission(staff.role,"operations") && typeof query.assigned === "string" ? query.assigned.slice(0,100) : "";
-  const where: Prisma.SupportTicketWhereInput = { AND: [supportScope(staff), { status }, ...(assigned?[{assignedAdminId:assigned}]:[]), ...(filters.q ? [{ OR: [{ booking: { refCode: { contains: filters.q, mode: "insensitive" as const } } }, { customer: { name: { contains: filters.q, mode: "insensitive" as const } } }] }] : [])] };
+  const where: Prisma.SupportTicketWhereInput = { AND: [supportScope(staff), ...(unanswered?[awaitingSupportReply()]:[{status}]), ...(assigned?[{assignedAdminId:assigned}]:[]), ...(filters.q ? [{ OR: [{ booking: { refCode: { contains: filters.q, mode: "insensitive" as const } } }, { customer: { name: { contains: filters.q, mode: "insensitive" as const } } }] }] : [])] };
   const total = await db.supportTicket.count({ where }), pages = Math.max(1, Math.ceil(total / pageSize)), page = pageNumber(query, pages);
   const tickets = await db.supportTicket.findMany({ where, include: { customer: { select: { name: true } }, booking: { select: { refCode: true } }, assignedAdmin: { select: { name: true } }, messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 } }, orderBy: [{ createdAt: filters.sort === "newest" ? "desc" : "asc" }, { id: "asc" }], take: pageSize, skip: (page - 1) * pageSize });
   return <div><div className="page-heading"><div><div className="eyebrow">CUSTOMER CARE</div><h1>Support inbox</h1><p>Claim requests, reply to customers, and send a handoff when you need help.</p></div></div>
-    <QueueFilters initial={filters} searchLabel="Search requests" placeholder="Booking or customer" />
+    <QueueFilters initial={filters} awaitingReply={unanswered} searchLabel="Search requests" placeholder="Booking or customer" />
     <div className="ticket-list">{tickets.map(ticket => <Link id={`ticket-${ticket.id}`} key={ticket.id} href={`/dashboard/support/${ticket.id}`} className="card ticket-row"><div><strong>{ticket.booking?.refCode ?? "Account help"}</strong><p className="muted small">{ticket.customer.name} · {ticket.category.replaceAll("_", " ")}</p><p className="ticket-preview">{ticket.messages[0]?.body ?? ticket.message}</p>{(!ticket.lastAdminReplyAt || ticket.lastCustomerMessageAt > ticket.lastAdminReplyAt) && ticket.status !== "RESOLVED" && <span className="badge badge-amber">Awaiting reply</span>}</div><div className="ticket-meta"><ReviewBadge value={ticket.status} status /><span className="muted small">{ticket.assignedAdmin?.name ?? "Unassigned"}</span><span className="muted small">Opened {ticket.createdAt.toLocaleString("en-PH", { timeZone: "Asia/Manila" })} (PH)</span></div></Link>)}</div>
     {!tickets.length && <div className="card empty-state">No requests match these filters.</div>}
-    <Pagination total={total} page={page} pages={pages} filters={{...filters,...(assigned?{assigned}:{})}} path="/dashboard/support" />
+    <Pagination total={total} page={page} pages={pages} filters={{...filters,...(unanswered?{unanswered:"1"}:{}),...(assigned?{assigned}:{})}} path="/dashboard/support" />
   </div>;
 }

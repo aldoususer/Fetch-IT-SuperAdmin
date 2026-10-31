@@ -36,6 +36,7 @@ export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
       if (!response.ok) throw new Error(data.error || 'Sign-in could not be completed.');
       setPassword(''); setNextPassword(''); setRepeat(''); setToken('');
       setMessage(data.message || 'Signed in.');
+      if(mode==='confirm')window.dispatchEvent(new CustomEvent('identity-verified',{detail:Date.now()}));
       if (mode !== 'confirm') router.replace('/dashboard');
       router.refresh();
     } catch (error) { setFailed(true);setMessage(error instanceof Error ? error.message : 'Please try again.'); }
@@ -47,6 +48,6 @@ export function OwnerPasswordForm({mode = 'login'}: {mode?: Mode}) {
     {change && <label>New password<input className="input" name="newPassword" type="password" autoComplete="new-password" value={nextPassword} onChange={e => setNextPassword(e.target.value)} minLength={15} maxLength={128} required/></label>}
     {(setup || change) && <><label>Confirm new password<input className="input" name="repeat" type="password" autoComplete="new-password" value={repeat} onChange={e => setRepeat(e.target.value)} minLength={15} maxLength={128} required/></label><p className="muted small">Use 15–128 characters. A unique passphrase works well.</p></>}
     {message && <p role={failed?"alert":"status"} className={failed?"error-message":"success-message"}>{message}</p>}
-    <button className="btn btn-primary" disabled={busy}>{busy ? 'Please wait…' : setup ? 'Save password & sign in' : change ? 'Change password' : mode === 'confirm' ? 'Confirm password' : 'Sign in'}</button>
+    <button className="btn btn-primary" disabled={busy}>{busy ? 'Please wait…' : setup ? 'Save password & sign in' : change ? 'Change password' : mode === 'confirm' ? 'Verify identity' : 'Sign in'}</button>
   </form>;
 }

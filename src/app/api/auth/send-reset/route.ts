@@ -1,1 +1,1 @@
-export async function POST(){return Response.json({error:'Owner access is recovered through the controlled enrollment procedure.'},{status:404});}
+export async function POST(){return Response.json({error:'Superadmin password reset requires an approved setup code.'},{status:404});}

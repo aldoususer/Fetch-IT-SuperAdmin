@@ -1,57 +1,10 @@
 "use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-export function BanButton({ userId, isBanned }: { userId: string; isBanned: boolean }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleBan() {
-    const reason = prompt("Reason for restricting this account (shown to the user):");
-    if (reason === null) return; // cancelled
-    if (!reason.trim() || reason.length > 500) { alert("Add a reason of up to 500 characters."); return; }
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ban", reason }),
-      });
-      if (!res.ok) throw new Error();
-      router.refresh();
-    } catch {
-      alert("Could not restrict this account.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleUnban() {
-    if (!confirm("Lift the restriction on this account?")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "unban" }),
-      });
-      if (!res.ok) throw new Error();
-      router.refresh();
-    } catch {
-      alert("Could not lift the restriction.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return isBanned ? (
-    <button className="btn" style={{ padding: "5px 12px", fontSize: 13 }} onClick={handleUnban} disabled={loading}>
-      {loading ? "…" : "Unban"}
-    </button>
-  ) : (
-    <button className="btn btn-danger" style={{ padding: "5px 12px", fontSize: 13 }} onClick={handleBan} disabled={loading}>
-      {loading ? "…" : "Ban"}
-    </button>
-  );
+import {RecordAction} from '@/components/record-action';
+export function BanButton({userId,isBanned,userName,userEmail}:{userId:string;isBanned:boolean;userName?:string;userEmail?:string}){
+ return <RecordAction url={'/api/users/'+encodeURIComponent(userId)} action={isBanned?'unban':'ban'}
+ label={isBanned?'Lift restriction':'Restrict account'} title={isBanned?'Lift this account restriction?':'Restrict this account?'}
+ target={userName??'Account '+userId} details={userEmail?[{label:'Email',value:userEmail}]:[{label:'Account ID',value:userId}]}
+ effect={isBanned?'Restores access to this account. The previous restriction remains in activity history.':'Restricts this account. The reason is shown to the account holder. Existing bookings keep their current status.'}
+ reasonHelp={isBanned?'Explain why access should be restored. This is recorded in activity history.':'Explain why this restriction is needed. This is shown to the account holder and recorded in activity history.'}
+ success={isBanned?'Account restriction lifted.':'Account restricted.'} danger={!isBanned}/>;
 }

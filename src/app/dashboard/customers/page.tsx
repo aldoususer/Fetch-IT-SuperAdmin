@@ -43,10 +43,10 @@ export default async function CustomersPage() {
                   {c.isBanned ? (
                     <span className="badge badge-red" title={c.banReason ?? undefined}>Restricted</span>
                   ) : (
-                    <span className="badge badge-gray">Active</span>
+                    <span className="badge badge-green">Active</span>
                   )}
                 </td>
-                <td><BanButton userId={c.id} isBanned={c.isBanned} /></td>
+                <td><BanButton userId={c.id} isBanned={c.isBanned} userName={c.name} userEmail={c.email} /></td>
               </tr>
             ))}
             {customers.length === 0 && (

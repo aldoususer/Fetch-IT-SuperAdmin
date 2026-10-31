@@ -1,8 +1,10 @@
 "use client";
+import {useVerifiedRequest} from "@/components/identity-verification";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PAYMENT_STATUS_LABEL, type PaymentStatus } from "@/lib/payment-policy";
 export function BookingControls({ id, status, paymentStatus, reference, canAssign, riders, demo = false, canPayout = false, payoutRecorded = false }: { id: string; status: string; paymentStatus: PaymentStatus; reference: string | null; canAssign: boolean; riders: { id: string; name: string }[]; demo?: boolean; canPayout?: boolean; payoutRecorded?: boolean }) {
+  const verifiedRequest=useVerifiedRequest();
   const router = useRouter();
   const pending = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -13,7 +15,7 @@ export function BookingControls({ id, status, paymentStatus, reference, canAssig
     const form = new FormData(event.currentTarget);
     pending.current = true; setBusy(true); setError(""); setMessage("");
     try {
-      const response = await fetch(`/api/bookings/${id}/${action}`, { method: action === "payment" ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(form)) });
+      const response = await verifiedRequest(`/api/bookings/${id}/${action}`, { method: action === "payment" ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(form)) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Couldn’t save this change.");
       setMessage(data.message); router.refresh();

@@ -1,7 +1,9 @@
 "use client";
+import {useVerifiedRequest} from "@/components/identity-verification";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 export function ReplyForm({ id, status: initialStatus, assignedAdminId: initialAssignee, updatedAt, admins }: { id: string; status: string; assignedAdminId: string | null; updatedAt: string; admins: {id:string;name:string}[] }) {
+  const verifiedRequest=useVerifiedRequest();
   const [failed,setFailed]=useState(false);
   const router = useRouter();
   const [status,setStatus] = useState(initialStatus), [assignedAdminId,setAssignee] = useState(initialAssignee ?? "");
@@ -11,7 +13,7 @@ export function ReplyForm({ id, status: initialStatus, assignedAdminId: initialA
   return <form className="support-reply" onSubmit={async event => {
     event.preventDefault(); if(busy) return; setBusy(true);setMessage("");setFailed(false);
     try {
-      const response = await fetch(`/api/support/${id}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status,assignedAdminId,reply,updatedAt,reason})});
+      const response = await verifiedRequest(`/api/support/${id}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status,assignedAdminId,reply,updatedAt,reason})});
       const data = await response.json(); if(!response.ok) throw new Error(data.error || "Couldn’t save the request.");
       setReply("");setReason("");setMessage("Saved under your Superadmin account. Your reason is recorded internally; a new public reply notifies the customer.");router.refresh();
     } catch(error) {setFailed(true);setMessage(error instanceof Error ? error.message : "Please retry.");}

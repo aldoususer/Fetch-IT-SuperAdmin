@@ -63,7 +63,7 @@ test('Existing fresh-password and origin requirements remain enforced',async()=>
   const foreign=endpoint();assert.equal((await foreign.save(policy.defaultPlatformSettings(),'https://foreign.invalid')).status,403);assert.equal(foreign.transactions(),0);
 });
 
-function hooks(){const values=[];let cursor=0;return {react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];}},render(component,props){cursor=0;return component(props);}};}
+function hooks(){const values=[];let cursor=0;return {react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];},useEffect(){},useRef(initial){const slot=cursor++;if(!(slot in values))values[slot]={current:initial};return values[slot];},useId(){return 'test';},useContext(){return (url,init)=>fetch(url,init);}},render(component,props){cursor=0;return component(props);}};}
 function elements(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(elements);return [tree,...elements(tree.props?.children)];}
 test('Typing an excessive amount shows a specific field error and disables Save immediately',async()=>{
   const h=hooks(),component=loader({react:h.react,'next/navigation':{useRouter:()=>({refresh(){}})}})('src/components/settings-form.tsx').SettingsForm;
@@ -71,10 +71,10 @@ test('Typing an excessive amount shows a specific field error and disables Save 
   const field=elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare');assert(field);
   field.props.onChange(1000000);tree=h.render(component,props);
   const next=elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare');assert.match(next.props.error,/Motorcycle base fare cannot exceed ₱1,000\.00/);
-  const save=elements(tree).find(e=>e.type==='button');assert.equal(save.props.disabled,true);
+  const save=elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes');assert.equal(save.props.disabled,true);
   let calls=0;const previous=global.fetch;global.fetch=async()=>{calls++;throw Error('Unexpected network call');};
-  try{await tree.props.onSubmit({preventDefault(){}});assert.equal(calls,0);}finally{global.fetch=previous;}
-  next.props.onChange(60);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button').props.disabled,false);
+  try{await elements(tree).find(e=>e.type==="form").props.onSubmit({preventDefault(){}});assert.equal(calls,0);}finally{global.fetch=previous;}
+  next.props.onChange(60);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
 });
 test('Number fields expose native bounds and accessible error feedback',()=>{
   const Field=load('src/components/settings-number-input.tsx').SettingsNumberInput;
