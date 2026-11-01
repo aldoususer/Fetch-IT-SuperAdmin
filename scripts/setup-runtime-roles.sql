@@ -71,3 +71,7 @@ DO $$ DECLARE t text; BEGIN
 END $$;
 -- No automatic grants on future tables. Review grants whenever schema changes.
 COMMIT;
+
+-- Automatic nearby offers use the existing operational runtime groups.
+GRANT SELECT,INSERT,UPDATE ON "AutoDispatch" TO fetch_customer_runtime,fetch_rider_runtime,fetch_staff_runtime,fetch_owner_runtime;
+GRANT UPDATE("lastOfferAt","updatedAt") ON "RiderPresence" TO fetch_staff_runtime,fetch_owner_runtime;
