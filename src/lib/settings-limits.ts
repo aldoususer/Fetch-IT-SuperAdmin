@@ -4,6 +4,9 @@ import {BOOKING_VEHICLE_CLASSES, VEHICLES} from './pricing-defaults';
 export type NumberRule={label:string;min:number;max:number;step:number;currency?:boolean;unit?:string};
 
 export const SETTING_NUMBER_RULES={
+  matchingRadiusKm:{label:'Automatic matching search radius',min:1,max:15,step:1,unit:'km'},
+  matchingOfferSeconds:{label:'Automatic offer duration',min:30,max:45,step:1,unit:'seconds'},
+  matchingMaxOffers:{label:'Automatic offers before open requests',min:1,max:3,step:1},
   commissionPercent:{label:'Demo commission (%)',min:0,max:100,step:.01,unit:'%'},
   offerSeconds:{label:'Rider offer duration (seconds)',min:30,max:600,step:1,unit:'seconds'},
   maxReassignments:{label:'Maximum previous riders before another manual offer',min:0,max:20,step:1},
