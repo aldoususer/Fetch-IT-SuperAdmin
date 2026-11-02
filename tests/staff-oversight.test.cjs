@@ -148,7 +148,7 @@ test('Grouped navigation renders all routes and highlights staff detail pages',(
   const {AdminShell}=load('src/app/dashboard/admin-shell.tsx',overrides);
   const markup=renderToStaticMarkup(React.createElement(AdminShell,{admin:{name:'QA Superadmin',email:'qa@example.invalid'}},'QA content'));
   for(const label of ['Platform management','Staff oversight','Bookings &amp; accounts'])assert(markup.includes(label));
-  assert.equal((markup.match(/class="sidebar-link/g)||[]).length,15);
+  assert.equal((markup.match(/class="sidebar-link/g)||[]).length,16);
   assert.match(markup,/<a\b(?=[^>]*href="\/dashboard\/staff")(?=[^>]*aria-current="page")[^>]*>/);
   assert.equal((markup.match(/aria-current="page"/g)||[]).length,1);
 });

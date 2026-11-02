@@ -1,31 +1,20 @@
-import { isSafetyAlert } from "@/lib/safety-alert";
-import { NextResponse } from "next/server";
-import { currentAdmin } from "@/lib/admin-access";
-import { db } from "@/lib/db";
-import { currentStaff } from "@/lib/staff-access";
-import { caseScope,hasPermission,supportScope } from "@/lib/staff-policy";
-export async function GET() {
-  try {
-    const staff=await currentStaff();
-    if (!staff) return NextResponse.json({ error: "Sign in with an active staff account." }, { status: 401 });
-    if(!hasPermission(staff.role,'operations')) {
-      const cases=await db.workflowCase.findMany({where:{AND:[caseScope(staff),{status:{notIn:['RESOLVED','REJECTED']}}]},take:30,orderBy:{updatedAt:'desc'},select:{id:true,title:true,status:true,updatedAt:true}});
-      const tickets=hasPermission(staff.role,'support')?await db.supportTicket.findMany({where:{AND:[supportScope(staff),{status:{not:'RESOLVED'}}]},take:30,orderBy:{updatedAt:'desc'},select:{id:true,message:true,priority:true,category:true,updatedAt:true}}):[];
-      return NextResponse.json({items:[...cases.map(c=>({id:c.id,title:c.title,detail:c.status,at:c.updatedAt.toISOString(),href:`/dashboard/cases/${c.id}`})),...tickets.map(t=>({id:t.id,title:isSafetyAlert(t.message, t.priority)?'Urgent safety alert':'Support request',detail:t.category,at:t.updatedAt.toISOString(),href:`/dashboard/support/${t.id}`}))].sort((a,b)=>Number(b.title.startsWith("Urgent safety alert"))-Number(a.title.startsWith("Urgent safety alert"))||b.at.localeCompare(a.at)),checkedAt:new Date().toISOString()},{headers:{'Cache-Control':'private, no-store'}});
-    }
-    const since = new Date(Date.now() - 7 * 86400000);
-    const [created, cancelled, tickets, replies] = await Promise.all([
-      db.booking.findMany({ where: { createdAt: { gte: since } }, select: { id: true, refCode: true, type: true, dropoffLabel: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 100 }),
-      db.booking.findMany({ where: { status: "CANCELLED", cancelledAt: { gte: since } }, select: { id: true, refCode: true, dropoffLabel: true, cancelledAt: true }, orderBy: { cancelledAt: "desc" }, take: 100 }),
-      db.supportTicket.findMany({ where: { OR: [{ createdAt: { gte: since } }, { priority: "URGENT", OR: [{ message: { startsWith: "URGENT SAFETY ALERT\n" } }, { message: { startsWith: "SOS EMERGENCY ALERT\n" } }], status: { not: "RESOLVED" } }] }, select: { id: true, message: true, priority: true, category: true, createdAt: true, booking: { select: { refCode: true } } }, orderBy: [{ priority: "desc" }, { createdAt: "desc" }], take: 100 }),
-      db.supportMessage.findMany({ where: { authorRole: "CUSTOMER", createdAt: { gte: since } }, select: { id: true, ticketId: true, body: true, createdAt: true, ticket: { select: { booking: { select: { refCode: true } }, customer: { select: { name: true } } } } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100 }),
-    ]);
-    const items = [
-      ...created.map(b => ({ id: `new:${b.id}`, title: `New ${b.type === "RIDE" ? "ride" : "delivery"}`, detail: `${b.refCode} · ${b.dropoffLabel}`, at: b.createdAt.toISOString(), href: `/dashboard/bookings/${b.id}` })),
-      ...cancelled.map(b => ({ id: `cancel:${b.id}`, title: "Booking cancelled", detail: `${b.refCode} · ${b.dropoffLabel}`, at: b.cancelledAt!.toISOString(), href: `/dashboard/bookings/${b.id}` })),
-      ...tickets.map(t => ({ id: `support:${t.id}`, title: isSafetyAlert(t.message, t.priority) ? "Urgent safety alert" : "New support request", detail: `${t.booking?.refCode ?? "Account help"} · ${t.category.replaceAll("_", " ")}`, at: t.createdAt.toISOString(), href: `/dashboard/support/${t.id}` })),
-      ...replies.map(m => ({ id: `support-reply:${m.id}`, title: "Customer replied", detail: `${m.ticket.booking?.refCode ?? "Account help"} · ${m.ticket.customer.name}: ${m.body.slice(0, 120)}`, at: m.createdAt.toISOString(), href: `/dashboard/support/${m.ticketId}` })),
-    ].sort((a, b) => Number(b.title.startsWith("Urgent safety alert")) - Number(a.title.startsWith("Urgent safety alert")) || b.at.localeCompare(a.at)).slice(0, 100);
-    return NextResponse.json({ items, checkedAt: new Date().toISOString() }, { headers: { "Cache-Control": "private, no-store" } });
-  } catch { return NextResponse.json({ error: "Notifications are unavailable. Please retry." }, { status: 503 }); }
+import {NextRequest,NextResponse} from 'next/server';
+import {currentStaff} from '@/lib/staff-access';
+import {db} from '@/lib/db';
+import {notificationFeed,noticeView,readNotifications,refreshOperationalSignals} from '@/lib/staff-notifications';
+export async function GET(req:NextRequest){
+ try{
+  const staff=await currentStaff();if(!staff)return NextResponse.json({error:'Sign in with an active staff account.'},{status:401});
+  await refreshOperationalSignals(db);
+  return NextResponse.json(await notificationFeed(db,staff,noticeView(req.nextUrl.searchParams.get('view'),staff.role),req.nextUrl.searchParams.get('before')??undefined),{headers:{'Cache-Control':'private, no-store'}});
+ }catch{return NextResponse.json({error:'Notifications are unavailable. Please retry.'},{status:503,headers:{'Cache-Control':'private, no-store'}});}
+}
+export async function PATCH(req:NextRequest){
+ if(req.headers.get('origin')!==req.nextUrl.origin||req.headers.get('sec-fetch-site')==='cross-site')return NextResponse.json({error:'This request is not allowed.'},{status:403});
+ try{
+  const staff=await currentStaff();if(!staff)return NextResponse.json({error:'Sign in again before marking notifications as read.'},{status:401});
+  const body=await req.json();
+  const result=await readNotifications(db,staff,noticeView(body.view,staff.role),body.ids);
+  return NextResponse.json(result,{headers:{'Cache-Control':'private, no-store'}});
+ }catch(error){return NextResponse.json({error:error instanceof Error&&/notifications|Choose up to/.test(error.message)?error.message:'Could not save read status. Please retry.'},{status:400});}
 }

@@ -3,10 +3,12 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useEffect,useState} from 'react';
 import {IdentityVerificationProvider} from '@/components/identity-verification';
+import {AdminInbox} from './admin-inbox';
 import {LogoutButton} from './logout-button';
 const groups = [
   {label: 'Platform management', links: [
     ['/dashboard', 'Dashboard'],
+    ['/dashboard/incidents', 'Platform incidents'],
     ['/dashboard/settings', 'Pricing & rules'],
     ['/dashboard/owners', 'Superadmin accounts'],
     ['/dashboard/security', 'Security & sessions'],
@@ -27,7 +29,7 @@ const groups = [
     ['/dashboard/reports', 'Platform reports'],
   ]},
 ];
-export function AdminShell({admin,verifiedAt,checkedAt,children}:{admin:{name:string;email:string};verifiedAt?:number;checkedAt?:number;children:React.ReactNode}) {
+export function AdminShell({admin,verifiedAt,checkedAt,children}:{admin:{id:string;name:string;email:string};verifiedAt?:number;checkedAt?:number;children:React.ReactNode}) {
   const pathname=usePathname(),[open,setOpen]=useState(false);
   const [verified,setVerified]=useState(verifiedAt??0),[now,setNow]=useState(checkedAt??0);
   useEffect(()=>{setNow(Date.now());const timer=setInterval(()=>setNow(Date.now()),15000);const verified=(event:Event)=>{setVerified((event as CustomEvent<number>).detail);setNow(Date.now());};window.addEventListener('identity-verified',verified);return()=>{clearInterval(timer);window.removeEventListener('identity-verified',verified);};},[]);
@@ -48,7 +50,8 @@ export function AdminShell({admin,verifiedAt,checkedAt,children}:{admin:{name:st
       <div className="sidebar-account"><strong>{admin.name}</strong><p>{admin.email}</p><LogoutButton/></div>
     </aside>
     <div className="admin-workspace">
-      <header className="admin-header"><button className="btn mobile-menu" aria-label="Open Superadmin navigation" aria-controls="owner-navigation" aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><span>Fetch Superadmin</span><Link className="btn" href="/dashboard/security"><span className={fresh?'badge badge-green':'badge badge-amber'}>{fresh?'Identity verified':'Verification required'}</span></Link></header>
+      <header className="admin-header"><button className="btn mobile-menu" aria-label="Open Superadmin navigation" aria-controls="owner-navigation" aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><span>Fetch Superadmin</span><AdminInbox adminId={admin.id}/><Link className="btn" href="/dashboard/security"><span className={fresh?'badge badge-green':'badge badge-amber'}>{fresh?'Identity verified':'Verification required'}</span></Link></header>
+      <div id="staff-notification-alerts"/>
       <main className="admin-main">{children}</main>
       <footer className="admin-footer">Superadmin access · Actions recorded under your own account</footer>
     </div>

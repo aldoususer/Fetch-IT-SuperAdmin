@@ -312,3 +312,9 @@ legend { padding: 0 8px; font-weight: 600; }
 .staff-form fieldset{display:grid;gap:16px}
 
 .record-action{display:inline-grid;gap:8px;max-width:28rem}.record-action>.success-message{margin:0;font-size:13px}.record-action-form{display:grid;gap:12px}.record-action-form h2,.record-action-form p{margin:0}.record-action-form textarea{min-height:110px;resize:vertical}.record-action-form .staff-actions{margin:12px 0 0}.action-target{overflow-wrap:anywhere}
+
+.notification-views{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.notification-emergency{border:2px solid #b42318;background:#fff1f0;color:#7a271a;border-radius:.5rem;padding:.75rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;position:static;margin:.75rem 1rem 0;width:auto;max-width:none}.notification-emergency span{font-size:.8rem}.inbox-list .inbox-item{display:flex;flex-direction:column;gap:.4rem;text-decoration:none;width:100%;padding:1rem;text-align:left}.inbox-list li{padding:.5rem;border-bottom:1px solid #dce5e2}.inbox-list li.unread{background:#fff7ed}.notification-bell{display:flex;gap:.5rem;align-items:center}.notification-emergency+.notification-bell{flex-shrink:0}
+
+
+
+.notification-bell{position:relative;width:auto}.notification-bell svg{flex-shrink:0}@media(max-width:600px){.notification-bell .small{display:none}}
