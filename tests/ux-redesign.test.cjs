@@ -30,7 +30,7 @@ const navigation={useRouter:()=>({refresh(){},push(){}})};
 const base=loader(),{defaultPlatformSettings}=base('src/lib/platform-policy.ts'),{describeChanges,eventTitle}=base('src/lib/ux-labels.ts');
 test('Human change summaries show exact changed values, ignore array order, and hide secrets',()=>{
  const a=defaultPlatformSettings(),b=structuredClone(a);b.fares.MOTORCYCLE.baseFare=70;b.vehicles.reverse();
- const changes=describeChanges(a,b);assert.equal(changes.length,1);assert.equal(changes[0].field,'Motorcycle · Base fare');assert.equal(changes[0].before,'₱60.00');assert.equal(changes[0].after,'₱70.00');
+ const changes=describeChanges(a,b);assert.equal(changes.length,1);assert.equal(changes[0].field,'Motorcycle · Base fare');assert.equal(changes[0].before,'₱50.00');assert.equal(changes[0].after,'₱70.00');
  assert.equal(describeChanges({passwordHash:'old'},{passwordHash:'new'}).length,0);assert.equal(describeChanges({role:'SUPPORT',disabled:false},{role:'ADMIN'}).length,1);assert.equal(eventTitle('OWNER_PASSWORD_SIGN_IN'),'Superadmin signed in');
 });
 test('Staff creation starts with no role and uses new-password autofill semantics',()=>{
@@ -114,7 +114,7 @@ test('Discard confirmation can be cancelled without losing settings',()=>{
  assert.equal(opened,1);elements(tree).find(e=>e.type==='button'&&e.props.children==='Keep editing').props.onClick();
  tree=h.render(Component,props);assert.equal(elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare').props.value,75);
  elements(tree).filter(e=>e.type==='button'&&e.props.children==='Discard changes').at(-1).props.onClick();
- tree=h.render(Component,props);assert.equal(elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare').props.value,60);
+ tree=h.render(Component,props);assert.equal(elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare').props.value,50);
  assert(elements(tree).some(e=>e.props?.role==='status'&&e.props.children==='Unsaved changes discarded.'));
 });
 

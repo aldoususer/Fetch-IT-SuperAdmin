@@ -1,8 +1,10 @@
+import { planningTravelSeconds } from "./eta-policy";
 // Haversine + fare utilities — pure functions shared by API and client.
 //
 // Pricing model (all amounts in PHP):
 //
-//   roadKm        = haversine(pickup, dropoff) * ROAD_DISTANCE_FACTOR
+//   roadKm        = validated ORS road distance when supplied; otherwise a
+//                   clearly labelled haversine estimate * ROAD_DISTANCE_FACTOR
 //   distanceFare  = km beyond the vehicle's includedKm, charged at perKm,
 //                   stepping down to longHaulPerKm past LONG_HAUL_THRESHOLD_KM
 //   weightFare    = kg above the vehicle's freeWeightKg, charged at perKgOverFree
@@ -22,6 +24,7 @@ import {
   type VehicleMeta,
 } from "./pricing-defaults";
 import { configuredSurge, type PlatformSettings } from "./platform-policy";
+import { BOOKING_FEES, FARE_POLICY_VERSION, RIDE_RATES } from "./fare-policy";
 
 export interface LatLng {
   lat: number;
@@ -59,6 +62,9 @@ export interface FareInput {
   cargoWeightKg: number;
   surgeMultiplier: number;
   vehicle: VehicleMeta;
+  passengers?: number;
+  bookingFee?: number;
+  roundingIncrement?: number;
 }
 
 export interface FareBreakdown {
@@ -74,10 +80,17 @@ export interface FareBreakdown {
   /** Weight actually charged for, after the free allowance. kg. */
   chargeableKg: number;
   currency: string;
+  pricingVersion?: string;
+  roundingAdjustment: number;
+  transportFare: number;
+  bookingFee: number;
 }
 
 export function computeFare(input: FareInput): FareBreakdown {
   const v = input.vehicle;
+  const passengers = input.passengers ?? 1;
+  if (!Number.isInteger(passengers) || passengers < 1 || !Number.isFinite(input.distanceKm)
+    || !Number.isFinite(input.cargoWeightKg)) throw new Error("Invalid fare details.");
   const distanceKm = Math.max(0, input.distanceKm);
   const weightKg = Math.max(0, Math.min(input.cargoWeightKg, v.capacityKg));
 
@@ -87,22 +100,29 @@ export function computeFare(input: FareInput): FareBreakdown {
   const cityKm = Math.min(billableKm, cityKmCap);
   const longHaulKm = billableKm - cityKm;
   const distanceFare = roundPeso(
-    cityKm * v.perKm + longHaulKm * v.longHaulPerKm,
+    (cityKm * v.perKm + longHaulKm * v.longHaulPerKm) * passengers,
   );
 
   // Weight: free allowance, then a flat rate per extra kg.
   const chargeableKg = Math.max(0, weightKg - v.freeWeightKg);
   const weightFare = roundPeso(chargeableKg * v.perKgOverFree);
 
-  const baseFare = roundPeso(v.baseFare);
+  const baseFare = roundPeso(v.baseFare * passengers);
   const subtotal = baseFare + distanceFare + weightFare;
 
   const surge = Math.max(1, input.surgeMultiplier);
   const surgeFare = roundPeso(subtotal * (surge - 1));
   const afterSurge = subtotal + surgeFare;
 
-  const minimumAdjustment = Math.max(0, roundPeso(v.minimumFare) - afterSurge);
-  const totalFare = afterSurge + minimumAdjustment;
+  const minimumAdjustment = Math.max(0, roundPeso(v.minimumFare * passengers) - afterSurge);
+  const increment = input.roundingIncrement ?? 1;
+  const transportFare = Math.max(
+    Math.ceil(v.minimumFare * passengers / increment) * increment,
+    Math.round((afterSurge + minimumAdjustment) / increment) * increment,
+  );
+  const roundingAdjustment = transportFare - afterSurge - minimumAdjustment;
+  const bookingFee = input.bookingFee ?? 0;
+  const totalFare = transportFare + bookingFee;
 
   return {
     baseFare,
@@ -111,6 +131,10 @@ export function computeFare(input: FareInput): FareBreakdown {
     surgeFare,
     minimumAdjustment,
     totalFare,
+    transportFare,
+    roundingAdjustment,
+    bookingFee,
+    ...(input.roundingIncrement ? { pricingVersion: FARE_POLICY_VERSION } : {}),
     billableKm: round2(billableKm),
     chargeableKg: round2(chargeableKg),
     currency: CURRENCY,
@@ -157,17 +181,20 @@ export function quoteFare(params: {
   cargoWeightKg: number;
   when?: Date;
   settings?: PlatformSettings;
+  route?: { distanceKm: number; durationSeconds: number };
 }): Quote {
   const vehicle = { ...VEHICLES[params.vehicleClass], ...params.settings?.fares[params.vehicleClass] };
   const straightLineKm = round2(haversineKm(params.pickup, params.dropoff));
-  const distanceKm = roadDistanceKm(params.pickup, params.dropoff);
-  const surgeMultiplier = params.settings ? configuredSurge(params.settings, params.when) : computeSurgeMultiplier(params.when ?? new Date());
+  const distanceKm = params.route ? round2(params.route.distanceKm) : roadDistanceKm(params.pickup, params.dropoff);
+  const surgeMultiplier = BOOKING_FEES[params.vehicleClass] !== undefined ? 1 : params.settings ? configuredSurge(params.settings, params.when) : computeSurgeMultiplier(params.when ?? new Date());
 
   const fare = computeFare({
     distanceKm,
     cargoWeightKg: params.cargoWeightKg,
     surgeMultiplier,
     vehicle,
+    bookingFee: BOOKING_FEES[params.vehicleClass] ?? 0,
+    roundingIncrement: BOOKING_FEES[params.vehicleClass] !== undefined ? 5 : undefined,
   });
 
   return {
@@ -175,7 +202,7 @@ export function quoteFare(params: {
     straightLineKm,
     surgeMultiplier,
     fare,
-    etaMinutes: etaMinutes(distanceKm, vehicle.speedKph, vehicle.handlingMinutes),
+    etaMinutes: params.route ? Math.max(1, Math.ceil(planningTravelSeconds(distanceKm * 1000, params.route.durationSeconds, params.vehicleClass, vehicle.speedKph) / 60 + vehicle.handlingMinutes)) : etaMinutes(distanceKm, vehicle.speedKph, vehicle.handlingMinutes),
     vehicle,
   };
 }
@@ -198,19 +225,24 @@ export function quoteRideFare(params: {
   pickup: LatLng;
   dropoff: LatLng;
   vehicleClass: VehicleClass;
+  passengers?: number;
   when?: Date;
   settings?: PlatformSettings;
+  route?: { distanceKm: number; durationSeconds: number };
 }): RideQuote {
-  const vehicle = { ...VEHICLES[params.vehicleClass], ...params.settings?.fares[params.vehicleClass] };
+  const vehicle = { ...VEHICLES[params.vehicleClass], ...RIDE_RATES[params.vehicleClass] };
   const straightLineKm = round2(haversineKm(params.pickup, params.dropoff));
-  const distanceKm = roadDistanceKm(params.pickup, params.dropoff);
-  const surgeMultiplier = params.settings ? configuredSurge(params.settings, params.when) : computeSurgeMultiplier(params.when ?? new Date());
+  const distanceKm = params.route ? round2(params.route.distanceKm) : roadDistanceKm(params.pickup, params.dropoff);
+  const surgeMultiplier = 1;
 
   const fare = computeFare({
     distanceKm,
     cargoWeightKg: 0, // passengers, not cargo
     surgeMultiplier,
     vehicle,
+    passengers: params.vehicleClass === "TRICYCLE" ? params.passengers ?? 1 : 1,
+    bookingFee: BOOKING_FEES[params.vehicleClass] ?? 0,
+    roundingIncrement: 5,
   });
 
   return {
@@ -219,7 +251,7 @@ export function quoteRideFare(params: {
     surgeMultiplier,
     fare,
     // No loading/paperwork overhead for rides — pickup is just boarding.
-    etaMinutes: etaMinutes(distanceKm, vehicle.speedKph, 0),
+    etaMinutes: params.route ? Math.max(1, Math.ceil(planningTravelSeconds(distanceKm * 1000, params.route.durationSeconds, params.vehicleClass, vehicle.speedKph) / 60)) : etaMinutes(distanceKm, vehicle.speedKph, 0),
     vehicle,
   };
 }

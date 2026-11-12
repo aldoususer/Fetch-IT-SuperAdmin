@@ -74,7 +74,7 @@ test('Typing an excessive amount shows a specific field error and disables Save 
   const save=elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes');assert.equal(save.props.disabled,true);
   let calls=0;const previous=global.fetch;global.fetch=async()=>{calls++;throw Error('Unexpected network call');};
   try{await elements(tree).find(e=>e.type==="form").props.onSubmit({preventDefault(){}});assert.equal(calls,0);}finally{global.fetch=previous;}
-  next.props.onChange(60);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
+  next.props.onChange(50);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
 });
 test('Number fields expose native bounds and accessible error feedback',()=>{
   const Field=load('src/components/settings-number-input.tsx').SettingsNumberInput;
