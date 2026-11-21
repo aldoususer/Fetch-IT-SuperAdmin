@@ -1,4 +1,5 @@
 export const APPLICATION_STATUS_FILTERS = [
+  { value: 'DRAFT', label: 'Draft', statuses: ['DRAFT'] },
   { value: 'PENDING_VERIFICATION', label: 'Pending verification', statuses: ['SUBMITTED', 'IN_REVIEW'] },
   { value: 'NEEDS_CORRECTION', label: 'Needs correction', statuses: ['NEEDS_CORRECTION'] },
   { value: 'ORIENTATION', label: 'For orientation', statuses: ['RECOMMENDED', 'ORIENTATION_SCHEDULED'] },
@@ -20,4 +21,8 @@ export function applicationQueueStatuses(value:string|null):string[]|undefined {
 
 export function normalizeApplicationFilter(value:string) {
   return APPLICATION_STATUS_FILTERS.find(option=>option.value===value||(option.statuses as readonly string[]).includes(value))?.value??'';
+}
+
+export function applicationStageLabel(status: string) {
+  return APPLICATION_STATUS_FILTERS.find(option=>(option.statuses as readonly string[]).includes(status))?.label ?? status.replaceAll('_',' ').toLowerCase().replace(/^./, c=>c.toUpperCase());
 }

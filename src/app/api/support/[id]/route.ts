@@ -5,6 +5,7 @@ import { supportScope,hasPermission } from "@/lib/staff-policy";
 import { db } from "@/lib/db";
 import { enqueueSupportNotification } from "@/lib/customer-notifications";
 import {interventionReason} from '@/lib/owner-intervention';
+import {supportIntentError} from '@/lib/support-presentation';
 import {StaffError} from '@/lib/staff-http';
 async function handlePATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +18,8 @@ async function handlePATCH(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params;
     const ticket = await db.supportTicket.findFirst({ where: { id,...supportScope(admin) }, include: { messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 } } });
     if (!ticket) return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    const intentError = supportIntentError(body, ticket);
+    if (intentError) return NextResponse.json({error: intentError}, {status: 400});
     const reply = body.reply.trim();
     if (body.status === "RESOLVED" && !reply && (!ticket.lastAdminReplyAt || ticket.lastCustomerMessageAt > ticket.lastAdminReplyAt)) return NextResponse.json({ error: "Reply to the customer's latest message before resolving this request." }, { status: 400 });
     if (body.updatedAt !== undefined && (typeof body.updatedAt !== "string" || body.updatedAt !== ticket.updatedAt.toISOString())) return NextResponse.json({ error: "This request has changed. Refresh before saving." }, { status: 409 });

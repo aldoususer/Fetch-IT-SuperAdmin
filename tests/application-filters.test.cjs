@@ -53,14 +53,14 @@ test('All statuses and legacy direct links keep working; invalid statuses cannot
   assert.equal((await f.get('ACTIVE','SUPPORT')).status,403);assert.equal(f.queries.length,before);
 });
 
-function hooks(){const values=[];let cursor=0;const effects=[];return {effects,react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];},useRef(initial){const slot=cursor++;return values[slot]??={current:initial};},useCallback(fn){return fn;},useContext(){return (url,init)=>fetch(url,init);},useEffect(fn){effects.push(fn);}},render(component,props){cursor=0;return component(props);}};}
+function hooks(){const values=[];let cursor=0;const effects=[];return {effects,react:{...require('react'),useState(initial){const slot=cursor++;if(!(slot in values))values[slot]=typeof initial==='function'?initial():initial;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];},useRef(initial){const slot=cursor++;return values[slot]??={current:initial};},useCallback(fn){return fn;},useContext(){return (url,init)=>fetch(url,init);},useEffect(fn,deps){effects.push({fn,deps});}},render(component,props){cursor=0;return component(props);}};}
 function elements(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(elements);return [tree,...elements(tree.props?.children)];}
 const tick=()=>new Promise(setImmediate);
 function client(directory=root,initialStatus='') {
   const h=hooks();
   const load=loader({react:h.react,'next/link':{__esModule:true,default:'a'},'@/hooks/use-local-demo':{useLocalDemo:()=>({enabled:false})},'@/hooks/use-visible-poll':{useVisiblePoll(){}}},directory);
   const component=load('src/components/rider-applications.tsx').RiderApplications;
-  return {render:()=>h.render(component,{initialStatus}),load:()=>h.effects.at(-2)(),search:()=>h.effects.at(-1)()};
+  return {render:()=>h.render(component,{initialStatus}),load:()=>h.effects.findLast(effect=>effect.deps?.length===1&&typeof effect.deps[0]==='function').fn(),search:()=>h.effects.findLast(effect=>effect.deps?.length===4).fn()};
 }
 for(const directory of [root,path.resolve(root,'../fetch-superadmin')].filter((directory,index,all)=>all.indexOf(directory)===index&&fs.existsSync(path.join(directory,'src/components/rider-applications.tsx'))))test(`${path.basename(directory)}: selection filters without submitting and removes old results immediately`,async()=>{
   const original=global.fetch,requests=[];global.fetch=async url=>{const parsed=new URL(url,'https://admin.example.invalid');requests.push(parsed);const statuses=queue.applicationQueueStatuses(parsed.searchParams.get('status'));return Response.json({applications:rows.filter(row=>!statuses||statuses.includes(row.status))});};

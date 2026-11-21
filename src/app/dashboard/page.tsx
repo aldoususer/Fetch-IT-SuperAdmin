@@ -1,3 +1,4 @@
+import {OwnerWorkSummary, StaffWorkload} from '@/components/owner-work-summary';
 import { expireRiderOffers } from "@/lib/dispatch";
 import { DemoActivityNotice, RiderApplicationSummary } from "@/components/overview-onboarding";
 import { db } from "@/lib/db";
@@ -8,7 +9,8 @@ import { ACTIVE_STATUSES, bookingWhere } from "@/lib/operations";
 import { BOOKING_STATUS_LABEL, VEHICLE_LABEL } from "@/lib/constants";
 import { DashboardCharts, type DayPoint, type StatusPoint, type VehiclePoint } from "./dashboard-charts";
 
-async function getStats() {
+async function getStats(includeDemo: boolean) {
+  const where = includeDemo ? {} : { NOT: { refCode: { startsWith: "DEMO-" } } };
   const [
     totalBookings,
     deliveryBookings,
@@ -19,14 +21,14 @@ async function getStats() {
     onlineRiders,
     revenueAgg,
   ] = await Promise.all([
-    db.booking.count(),
-    db.booking.count({ where: { type: "DELIVERY" } }),
-    db.booking.count({ where: { type: "RIDE" } }),
-    db.booking.count({ where: { status: { in: ACTIVE_STATUSES } } }),
+    db.booking.count({where}),
+    db.booking.count({ where: { ...where, type: "DELIVERY" } }),
+    db.booking.count({ where: { ...where, type: "RIDE" } }),
+    db.booking.count({ where: { ...where, status: { in: ACTIVE_STATUSES } } }),
     db.user.count({ where: { role: "CUSTOMER" } }),
     db.user.count({ where: { role: "RIDER" } }),
     db.user.count({ where: { role: "RIDER", isBanned: false, riderPresence: { is: { isOnline: true } } } }),
-    db.booking.aggregate({ where: { status: "DELIVERED" }, _sum: { totalFare: true } }),
+    db.booking.aggregate({ where: { ...where, status: "DELIVERED" }, _sum: { totalFare: true } }),
   ]);
 
   return {
@@ -41,17 +43,18 @@ async function getStats() {
   };
 }
 
-async function getChartData() {
+async function getChartData(includeDemo: boolean) {
+  const where = includeDemo ? {} : { NOT: { refCode: { startsWith: "DEMO-" } } };
   const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
   const since = new Date(new Date(`${today}T00:00:00+08:00`).getTime() - 13 * 86400000);
 
   const [recentBookings, statusGroups, vehicleGroups] = await Promise.all([
     db.booking.findMany({
-      where: { createdAt: { gte: since } },
+      where: { ...where, createdAt: { gte: since } },
       select: { createdAt: true, status: true, totalFare: true },
     }),
-    db.booking.groupBy({ by: ["status"], _count: { _all: true } }),
-    db.booking.groupBy({ by: ["vehicleClass"], _count: { _all: true } }),
+    db.booking.groupBy({ where, by: ["status"], _count: { _all: true } }),
+    db.booking.groupBy({ where, by: ["vehicleClass"], _count: { _all: true } }),
   ]);
 
   const days: DayPoint[] = [];
@@ -99,11 +102,12 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export default async function OverviewPage() {
-  await requireAdminPage();
+export default async function OverviewPage({searchParams}: {searchParams: Promise<Record<string,string|string[]|undefined>>}) {
+  const owner=await requireAdminPage();
+  const query=await searchParams, includeDemo=query.demo==='include';
   await expireRiderOffers(db);
   const now = new Date();
-  const [stats, chartData, unassigned, stalled, support] = await Promise.all([getStats(), getChartData(),
+  const [stats, chartData, unassigned, stalled, support] = await Promise.all([getStats(includeDemo), getChartData(includeDemo),
     db.booking.count({ where: bookingWhere({ attention: "unassigned" }, now) }),
     db.booking.count({ where: bookingWhere({ attention: "stalled" }, now) }),
     db.supportTicket.count({ where: awaitingSupportReply() }),
@@ -111,13 +115,16 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <div className="page-heading"><div><div className="eyebrow">SUPERADMIN OVERVIEW</div><h1>Platform overview</h1><p className="muted small">Oversee staff access, platform rules, and decisions that need your attention.</p></div><p className="muted small">As of {now.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p></div>
-      <section className="card attention-panel"><h2>Manage the platform</h2><div className="attention-grid"><Link className="attention-item" href="/dashboard/staff"><span>Staff & permissions →</span><small>Review assigned work and control staff access.</small></Link><Link className="attention-item" href="/dashboard/settings"><span>Pricing & rules →</span><small>Review fares, commission, and service availability.</small></Link><Link className="attention-item" href="/dashboard/cases?status=IN_REVIEW"><span>Review decisions →</span><small>Inspect recommendations and independent approvals.</small></Link></div></section><DemoActivityNotice/>
-      <section className="card attention-panel" aria-labelledby="attention-title"><h2 id="attention-title">Needs attention</h2><p className="muted small">Review these queues before moving on to the numbers.</p><div className="attention-grid">
+      <div className="page-heading"><div><h1>Platform overview</h1><p className="muted small">Oversee staff access, platform rules, and decisions that need your attention.</p></div><p className="muted small">As of {now.toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</p></div>
+      <OwnerWorkSummary actorId={owner.id}/>
+      <section className="card attention-panel" aria-labelledby="attention-title"><h2 id="attention-title">Needs attention</h2><p className="muted small">Operational exceptions across your teams.</p><div className="attention-grid">
         <Link href="/dashboard/bookings?attention=unassigned" className="attention-item"><strong>{unassigned}</strong><span>Waiting for a rider →</span><small>Unassigned for over 5 minutes. Future scheduled bookings excluded.</small></Link>
         <Link href="/dashboard/bookings?attention=stalled" className="attention-item"><strong>{stalled}</strong><span>Check booking progress →</span><small>Assigned bookings with no record update for 30 minutes.</small></Link>
         <Link href="/dashboard/support?unanswered=1" className="attention-item"><strong>{support}</strong><span>Awaiting staff reply →</span><small>Open or in-review requests awaiting a staff reply.</small></Link>
       </div></section>
+      <StaffWorkload/>
+      <section aria-labelledby="performance-title"><div className="page-heading"><h2 id="performance-title">Platform performance</h2><form><label className="owner-check"><input type="checkbox" name="demo" value="include" defaultChecked={includeDemo}/>Include demo bookings</label><button className="btn">Update metrics</button></form></div>
+      {includeDemo?<DemoActivityNotice/>:<p className="muted small">Labeled demo bookings are excluded. Account counts include all accounts.</p>}
       <div className="stat-grid">
         <StatCard label="Total bookings" value={stats.totalBookings} />
         <StatCard label="Delivery bookings" value={stats.deliveryBookings} />
@@ -134,7 +141,7 @@ export default async function OverviewPage() {
         statusBreakdown={chartData.statusBreakdown}
         vehicleBreakdown={chartData.vehicleBreakdown}
       />
-      <RiderApplicationSummary/>
+      </section><RiderApplicationSummary/>
     </div>
   );
 }

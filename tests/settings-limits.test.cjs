@@ -71,10 +71,10 @@ test('Typing an excessive amount shows a specific field error and disables Save 
   const field=elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare');assert(field);
   field.props.onChange(1000000);tree=h.render(component,props);
   const next=elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare');assert.match(next.props.error,/Motorcycle base fare cannot exceed ₱1,000\.00/);
-  const save=elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes');assert.equal(save.props.disabled,true);
+  const save=elements(tree).find(e=>e.type==='button'&&e.props.children==='Review pricing changes');assert.equal(save.props.disabled,true);
   let calls=0;const previous=global.fetch;global.fetch=async()=>{calls++;throw Error('Unexpected network call');};
   try{await elements(tree).find(e=>e.type==="form").props.onSubmit({preventDefault(){}});assert.equal(calls,0);}finally{global.fetch=previous;}
-  next.props.onChange(50);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
+  next.props.onChange(50);tree=h.render(component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review pricing changes').props.disabled,true);
 });
 test('Number fields expose native bounds and accessible error feedback',()=>{
   const Field=load('src/components/settings-number-input.tsx').SettingsNumberInput;

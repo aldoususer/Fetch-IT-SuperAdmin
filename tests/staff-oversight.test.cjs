@@ -152,3 +152,22 @@ test('Grouped navigation renders all routes and highlights staff detail pages',(
   assert.match(markup,/<a\b(?=[^>]*href="\/dashboard\/staff")(?=[^>]*aria-current="page")[^>]*>/);
   assert.equal((markup.match(/aria-current="page"/g)||[]).length,1);
 });
+
+for(const intent of ['reply','manage'])test(`Explicit ${intent} action rejects a mixed customer message and reassignment`,async()=>{
+ const f=fixture();f.ticket.status='OPEN';
+ const response=await f.request('support',{...supportBody,intent,reply:'Customer-facing text'});
+ assert.equal(response.status,400);assert.equal(f.messages.length,0);assert.equal(f.audits.length,0);
+});
+test('Reply-only action preserves assignment and status and records the public message',async()=>{
+ const f=fixture();f.ticket.status='OPEN';
+ assert.equal((await f.request('support',{...supportBody,intent:'reply',assignedAdminId:'support-a',reply:'We are checking the duplicate authorization.'})).status,200);
+ assert.equal(f.ticket.assignedAdminId,'support-a');assert.equal(f.ticket.status,'OPEN');assert.equal(f.messages.length,1);
+});
+test('Manage-only action changes assignment without sending a public message',async()=>{
+ const f=fixture();assert.equal((await f.request('support',{...supportBody,intent:'manage'})).status,200);
+ assert.equal(f.ticket.assignedAdminId,'support-b');assert.equal(f.messages.length,0);assert.equal(f.audits.length,1);
+});
+test('Resolved requests must be reopened before a reply-only action',async()=>{
+ const f=fixture();assert.equal((await f.request('support',{...supportBody,intent:'reply',status:'RESOLVED',assignedAdminId:'support-a',reply:'New reply'})).status,400);
+ assert.equal(f.messages.length,0);
+});

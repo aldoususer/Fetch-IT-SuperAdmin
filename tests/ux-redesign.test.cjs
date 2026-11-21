@@ -44,7 +44,7 @@ test('Settings review preserves edits, shows before/after, and performs no write
  const load=loader({react:h.react,'next/navigation':navigation});
  const Component=load('src/components/settings-form.tsx').SettingsForm,props={initial:defaultPlatformSettings(),version:8};
  let tree=h.render(Component,props);
- assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
+ assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review pricing changes').props.disabled,true);
  elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare').props.onChange(70);
  tree=h.render(Component,props);elements(tree).find(e=>e.type==='textarea').props.onChange({target:{value:'Adjust local pricing'}});
  tree=h.render(Component,props);
@@ -58,7 +58,7 @@ test('Settings review preserves edits, shows before/after, and performs no write
   assert.equal(elements(tree).find(e=>e.props?.id==='fare-MOTORCYCLE-baseFare').props.value,70);
   const confirm=elements(tree).find(e=>e.type==='button'&&typeof e.props.children==='string'&&/^Save [0-9]+ change/.test(e.props.children));await confirm.props.onClick();await new Promise(resolve=>setImmediate(resolve));
   assert.equal(calls.length,1);assert.equal(calls[0][1].version,8);assert.equal(calls[0][1].settings.fares.MOTORCYCLE.baseFare,70);assert.equal(calls[0][1].reason,'Adjust local pricing');
-  tree=h.render(Component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review changes').props.disabled,true);
+  tree=h.render(Component,props);assert.equal(elements(tree).find(e=>e.type==='button'&&e.props.children==='Review pricing changes').props.disabled,true);
   assert(elements(tree).some(e=>e.props?.role==='status'&&e.props.children==='Platform rules saved.'));
  }finally{global.fetch=old;}
 });
@@ -92,7 +92,7 @@ test('Dashboard attention destination includes awaiting replies from both active
   {id:'closed',status:'RESOLVED',lastAdminReplyAt:null,lastCustomerMessageAt:2},
  ];
  const matches=(ticket,where)=>Object.entries(where).every(([key,value])=>key==='AND'?value.every(w=>matches(ticket,w)):key==='OR'?value.some(w=>matches(ticket,w)):key==='status'?typeof value==='string'?ticket.status===value:value.in.includes(ticket.status):key==='lastAdminReplyAt'?ticket[key]===value:key==='lastCustomerMessageAt'?ticket[key]>ticket.lastAdminReplyAt:true);
- const db={supportTicket:{fields:{lastAdminReplyAt:{ref:'lastAdminReplyAt'}},async count({where}){actualWhere=where;return tickets.filter(t=>matches(t,where)).length+20;},async findMany({where}){return tickets.filter(t=>matches(t,where)).map(t=>({...t,category:'OTHER',customer:{name:'Synthetic'},booking:null,assignedAdmin:null,messages:[],createdAt:new Date('2026-10-01')}));}}};
+ const db={supportTicket:{fields:{lastAdminReplyAt:{ref:'lastAdminReplyAt'}},async count({where}){actualWhere=where;return tickets.filter(t=>matches(t,where)).length+20;},async findMany({where}){return tickets.filter(t=>matches(t,where)).map(t=>({...t,message:'Please trace this booking.',category:'OTHER',customer:{name:'Synthetic'},booking:null,assignedAdmin:null,messages:[],createdAt:new Date('2026-10-01')}));}}};
  const load=loader({'@/lib/db':{db},'next/link':emptyLink,'@/lib/staff-access':{requireStaffPage:async()=>({id:'owner',role:'SUPERADMIN'})},'./queue-filters':{QueueFilters:()=>null},'./action-form':{ActionForm:()=>null}});
  const Page=load('src/components/review-pages.tsx').SupportPage;
  const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({unanswered:'1'})}));
@@ -131,4 +131,14 @@ test('A conflicting settings save retains the reason and draft until explicitly 
   assert(elements(tree).some(e=>e.props?.role==='alert'&&e.props.children==='Another Superadmin changed these settings.'));
   assert(elements(tree).some(e=>e.type==='button'&&e.props.children==='Discard draft & load latest'));
  }finally{global.fetch=old;}
+});
+
+for(const includeDemo of [false,true])test('Dashboard metrics consistently '+(includeDemo?'include':'exclude')+' labeled demo bookings',async()=>{
+ const calls=[];const booking={};for(const method of ['count','aggregate','findMany','groupBy'])booking[method]=async input=>{calls.push({method,input});return method==='count'?0:method==='aggregate'?{_sum:{totalFare:0}}:[];};
+ const db={booking,user:{count:async()=>0},supportTicket:{fields:{lastAdminReplyAt:{}},count:async()=>0}};
+ const load=loader({'@/lib/db':{db},'@/lib/admin-access':{requireAdminPage:async()=>({id:'owner'})},'@/lib/dispatch':{expireRiderOffers:async()=>{}},'next/link':emptyLink});
+ await load('src/app/dashboard/page.tsx').default({searchParams:Promise.resolve(includeDemo?{demo:'include'}:{})});
+ const metricQueries=calls.slice(0,7).concat(calls.filter(call=>['aggregate','findMany','groupBy'].includes(call.method)));
+ assert(metricQueries.length>=8);
+ for(const query of metricQueries){assert.equal(query.input?.where?.NOT?.refCode?.startsWith,includeDemo?undefined:'DEMO-');}
 });

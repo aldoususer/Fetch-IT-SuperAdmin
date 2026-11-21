@@ -22,12 +22,17 @@ export const SETTING_NUMBER_RULES={
 export const FARE_NUMBER_RULES={
   baseFare:{label:'Base fare',min:0,max:1000,step:.01,currency:true},
   minimumFare:{label:'Minimum fare',min:0,max:1000,step:.01,currency:true},
-  includedKm:{label:'Included distance',min:0,max:100000,step:.01,unit:'km'},
+  includedKm:{label:'Included distance',min:0,max:100,step:.01,unit:'km'},
   perKm:{label:'Per km',min:0,max:100,step:.01,currency:true},
   longHaulPerKm:{label:'Long-haul per km',min:0,max:100,step:.01,currency:true},
-  freeWeightKg:{label:'Included weight',min:0,max:100000,step:.01,unit:'kg'},
+  freeWeightKg:{label:'Included weight',min:0,max:20,step:.01,unit:'kg'},
   perKgOverFree:{label:'Per extra kg',min:0,max:100,step:.01,currency:true},
 } satisfies Record<keyof PlatformSettings['fares'][string],NumberRule>;
+
+export function fareNumberRule(vehicle:string,field:keyof typeof FARE_NUMBER_RULES):NumberRule {
+  const rule=FARE_NUMBER_RULES[field];
+  return field==='freeWeightKg'?{...rule,max:VEHICLES[vehicle as keyof typeof VEHICLES].capacityKg}:rule;
+}
 
 export function limitValue(value:number,rule:NumberRule) {
   return rule.currency?`₱${value.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}`:`${value.toLocaleString('en-PH')}${rule.unit?' '+rule.unit:''}`;
@@ -55,7 +60,7 @@ export function settingsUpdateIssues(value:unknown):Record<string,string> {
   const fares=input.fares as PlatformSettings['fares']|undefined;
   for(const vehicle of BOOKING_VEHICLE_CLASSES)for(const [key,rule]of Object.entries(FARE_NUMBER_RULES)){
     const field=key as keyof typeof FARE_NUMBER_RULES;
-    const message=issue(fares?.[vehicle]?.[field],rule,`${VEHICLES[vehicle].label} ${rule.label.toLowerCase()}`);
+    const message=issue(fares?.[vehicle]?.[field],fareNumberRule(vehicle,field),`${VEHICLES[vehicle].label} ${rule.label.toLowerCase()}`);
     if(message)errors[`fares.${vehicle}.${field}`]=message;
   }
   return errors;
