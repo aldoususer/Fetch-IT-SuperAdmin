@@ -17,7 +17,7 @@ const groups = [
   {label: 'Staff oversight', links: [
     ['/dashboard/staff', 'Staff & permissions'],
     ['/dashboard/support', 'Support inbox'],
-    ['/dashboard/cases', 'Cases & escalations'],
+    ['/dashboard/cases', 'Review cases'],
     ['/dashboard/finance', 'Payment records'],
     ['/dashboard/audit', 'Operations history'],
   ]},

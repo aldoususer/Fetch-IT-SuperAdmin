@@ -14,7 +14,7 @@ export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}
       if(!record) throw new StaffError('Case unavailable.',404);
       if(body.version!==record.version) throw new StaffError('This case changed. Refresh and try again.',409);
       const operations=hasPermission(staff.role,'operations');
-      const canManage=operations || (record.kind==='ESCALATION'&&hasPermission(staff.role,'support.manage'));
+      const canManage=operations;
       const owned=record.assignedToId===staff.id;
       const reviewer=canReviewCase(staff.role,record.kind);
       if(!reviewer && !(body.action==='note' && record.createdById===staff.id)) throw new StaffError('Only the receiving reviewer can manage this case.',403);
@@ -25,7 +25,7 @@ export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}
         data={...data,assignedToId:staff.id,status:record.status==='OPEN'?'IN_REVIEW':record.status};
       } else if(body.action==='assign' && canManage) {
         const roles=caseReviewerRoles(record.kind);
-        const assignee=await tx.user.findFirst({where:{id:text(body.assignedToId,100),role:{in:roles as ('ADMIN'|'FINANCE'|'SAFETY'|'SUPPORT'|'SUPPORT_SUPERVISOR')[]},isBanned:false}});
+        const assignee=await tx.user.findFirst({where:{id:text(body.assignedToId,100),role:{in:roles},isBanned:false}});
         if(!assignee) throw new StaffError('Choose an active reviewer for this team.');data={...data,assignedToId:assignee.id};
       } else if(body.action==='note') {
         if(!owned&&!canManage&&record.createdById!==staff.id) throw new StaffError('Claim this case before adding evidence.',403);
@@ -39,9 +39,9 @@ export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}
         if(record.createdById===staff.id || record.assignedToId===staff.id) throw new StaffError('A different administrator must review your recommendation.',403);
         if(!['APPROVED','REJECTED'].includes(body.outcome)) throw new StaffError('Choose approve or reject.');
         data={...data,status:body.outcome,decision:text(body.reason,4000),decidedById:staff.id,decidedAt:new Date()};
-      } else if(body.action==='close'&& (operations || record.kind==='ESCALATION'&&hasPermission(staff.role,'support.manage') || record.kind==='SAFETY'&&hasPermission(staff.role,'safety')&&owned)) {
+      } else if(body.action==='close'&& (operations || record.kind==='SAFETY'&&hasPermission(staff.role,'safety')&&owned)) {
         if(!['APPROVED','IN_REVIEW','OPEN'].includes(record.status)) throw new StaffError('This case cannot be closed yet.',409);
-        if(record.kind!=='ESCALATION'&&record.status!=='APPROVED') throw new StaffError('An administrator must approve the recommendation first.',409);
+        if(record.status!=='APPROVED') throw new StaffError('An administrator must approve the recommendation first.',409);
         await tx.workflowNote.create({data:{caseId:id,authorId:staff.id,authorName:staff.name,body:`Resolution: ${text(body.reason,4000)}`}});data={...data,status:'RESOLVED'};
       } else throw new StaffError('You cannot perform this action.',403);
       const updated=await tx.workflowCase.update({where:{id},data});

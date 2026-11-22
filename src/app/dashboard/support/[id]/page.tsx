@@ -12,7 +12,7 @@ export default async function Page({params}:{params:Promise<{id:string}>}){
   const staff=await requireStaffPage('support');const{id}=await params;
   const ticket=await db.supportTicket.findFirst({where:{id,...supportScope(staff)},include:{customer:{select:{name:true,email:true}},booking:{select:{id:true,refCode:true}},messages:{orderBy:[{createdAt:'asc'},{id:'asc'}],take:200}}});if(!ticket)notFound();
   const [admins,notes,history]=await Promise.all([
-    db.user.findMany({where:{role:{in:['ADMIN','SUPPORT','SUPPORT_SUPERVISOR']},isBanned:false,...(!hasPermission(staff.role,'support.manage')?{id:staff.id}:{})},select:{id:true,name:true},orderBy:{name:'asc'}}),
+    db.user.findMany({where:{role:{in:['ADMIN','SUPPORT']},isBanned:false,...(!hasPermission(staff.role,'support.manage')?{id:staff.id}:{})},select:{id:true,name:true},orderBy:{name:'asc'}}),
     db.supportInternalNote.findMany({where:{ticketId:id},orderBy:{createdAt:'asc'},take:100}),
     db.supportTicket.findMany({where:{AND:[supportScope(staff),{customerId:ticket.customerId}]},orderBy:{createdAt:'desc'},take:15,select:{id:true,category:true,status:true}}),
   ]);

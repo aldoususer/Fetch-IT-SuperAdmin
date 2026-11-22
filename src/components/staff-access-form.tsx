@@ -4,12 +4,11 @@ import {ActionForm} from './action-form';
 import {ROLE_LABELS,STAFF_ROLES} from '@/lib/staff-policy';
 const summaries:Record<string,string>={
  ADMIN:'Oversees daily operations, staff work, and cases that require an independent operational decision.',
- SUPPORT:'Replies to customer requests and asks a supervisor or Safety Review for help.',
- SUPPORT_SUPERVISOR:'Handles escalated support requests, guides support staff, and manages support resources.',
+ SUPPORT:'Replies to customer requests and asks Safety Review for help.',
  SAFETY:'Reviews safety incidents and rider applications, records evidence, and recommends action.',
 };
 export function StaffAccessForm({person}:{person?:{id:string;name:string;role:string;isBanned:boolean}}){
- const [role,setRole]=useState(person?.role==='FINANCE'?'':person?.role??'');
+ const [role,setRole]=useState(person?.role??'');
  return <section><h2>{person?'Change role':'Account details'}</h2><p>{person?'Changing a role signs this person out on all devices. Their account remains active unless you disable it.':'Choose the access this person needs. No role is selected automatically.'}</p>
  <ActionForm url="/api/staff" hidden={person?{action:'role',id:person.id}:{action:'create'}} confirm label={person?'Save role change':'Create staff account'}
  confirmation={person?'Change permissions for '+person.name+' and sign them out on all devices?':'Create a new staff account with the selected permissions?'}

@@ -14,7 +14,7 @@ async function handlePATCH(request: NextRequest, { params }: { params: Promise<{
     const body = await request.json().catch(() => null);
     if (!body || !["OPEN", "IN_PROGRESS", "RESOLVED"].includes(body.status) || typeof body.reply !== "string" || body.reply.length > 2000) return NextResponse.json({ error: "Choose a valid status and reply of up to 2,000 characters." }, { status: 400 });
     const reason=interventionReason(body.reason);
-    if(body.priority!==undefined) return NextResponse.json({error:'Choose priority when sending a supervisor or Safety handoff, not on the customer request.'},{status:400});
+    if(body.priority!==undefined) return NextResponse.json({error:'Choose priority when sending a Safety handoff, not on the customer request.'},{status:400});
     const { id } = await params;
     const ticket = await db.supportTicket.findFirst({ where: { id,...supportScope(admin) }, include: { messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 } } });
     if (!ticket) return NextResponse.json({ error: "Request not found." }, { status: 404 });
@@ -28,7 +28,7 @@ async function handlePATCH(request: NextRequest, { params }: { params: Promise<{
     if (assignee !== null && typeof assignee !== "string") return NextResponse.json({ error: "Choose an active admin." }, { status: 400 });
     if (assignee) {
       const assigned = await db.user.findUnique({ where: { id: assignee }, select: { role: true, isBanned: true } });
-      if (!assigned || !['ADMIN','SUPPORT','SUPPORT_SUPERVISOR'].includes(assigned.role) || assigned.isBanned) return NextResponse.json({ error: "Choose an active support team member." }, { status: 400 });
+      if (!assigned || !['ADMIN','SUPPORT'].includes(assigned.role) || assigned.isBanned) return NextResponse.json({ error: "Choose an active support team member." }, { status: 400 });
     }
     const result = await db.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${id} FOR UPDATE`;

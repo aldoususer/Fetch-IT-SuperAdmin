@@ -34,11 +34,11 @@ test('Unknown permissions and unrecognized roles are denied',()=>{
   assert.equal(policy.hasPermission('unknown','operations'),false);
 });
 test('Lower staff roles retain their task boundaries',()=>{
-  for(const [role,allowed]of Object.entries({SUPPORT:['support'],FINANCE:[],SAFETY:['safety'],SUPPORT_SUPERVISOR:['support','support.manage','resources.edit'],ADMIN:permissions})) {
+  for(const [role,allowed]of Object.entries({SUPPORT:['support'],FINANCE:[],SAFETY:['safety'],SUPPORT_SUPERVISOR:[],ADMIN:permissions})) {
     for(const permission of permissions)assert.equal(policy.hasPermission(role,permission),allowed.includes(permission),`${role}: ${permission}`);
   }
   assert.deepEqual(JSON.parse(JSON.stringify(policy.supportScope({id:'support',role:'SUPERADMIN'}))),{});
-  assert.deepEqual(JSON.parse(JSON.stringify(policy.caseScope({id:'owner',role:'SUPERADMIN'}))),{});
+  assert.deepEqual(JSON.parse(JSON.stringify(policy.caseScope({id:'owner',role:'SUPERADMIN'}))),{kind:{in:['SAFETY','FINANCE']}});
   assert.notDeepEqual(JSON.parse(JSON.stringify(policy.supportScope({id:'support',role:'SUPPORT'}))),{});
 });
 

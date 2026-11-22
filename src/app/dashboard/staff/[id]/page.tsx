@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {notFound} from 'next/navigation';
 import {db} from '@/lib/db';
 import {requireStaffPage} from '@/lib/staff-access';
-import {isManagedStaffRole, ROLE_LABELS} from '@/lib/staff-policy';
+import {isStaffRole, ROLE_LABELS} from '@/lib/staff-policy';
 import {pageNumber} from '@/lib/operations';
 
 const size=20;
@@ -17,7 +17,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
   await requireStaffPage('operations');
   const [{id},query]=await Promise.all([params,searchParams]);
   const person=await db.user.findUnique({where:{id},select:{id:true,name:true,email:true,role:true,isBanned:true}});
-  if(!person||!isManagedStaffRole(person.role))notFound();
+  if(!person||!isStaffRole(person.role))notFound();
   const tab=query.tab==='access'?'access':query.tab==='activity'?'activity':'work';
   const ticketsWhere={assignedAdminId:id,status:{not:'RESOLVED' as const}};
   const casesWhere={assignedToId:id,status:{not:'RESOLVED'}};
@@ -44,12 +44,12 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
   const target=(type:string,recordId:string)=>type==='SUPPORT'?`/dashboard/support/${encodeURIComponent(recordId)}`:type==='CASE'?`/dashboard/cases/${encodeURIComponent(recordId)}`:type==='BOOKING'?`/dashboard/bookings/${encodeURIComponent(recordId)}`:null;
   return <div className="staff-oversight">
     <Link href="/dashboard/staff">← Back to staff</Link>
-    <div className="page-heading"><div><div className="eyebrow">STAFF OVERSIGHT</div><h1>{person.name}</h1><p>{person.email} · {ROLE_LABELS[person.role]} · <span className={'badge '+(person.isBanned?'badge-red':person.role==='FINANCE'?'badge-amber':'badge-green')}>{person.isBanned?'Disabled':person.role==='FINANCE'?'Role retired':'Active'}</span></p><p>Review this person’s assigned work and recorded actions. Interventions use your Superadmin account and require a reason.</p></div></div>
+    <div className="page-heading"><div><div className="eyebrow">STAFF OVERSIGHT</div><h1>{person.name}</h1><p>{person.email} · {ROLE_LABELS[person.role]} · <span className={'badge '+(person.isBanned?'badge-red':'badge-green')}>{person.isBanned?'Disabled':'Active'}</span></p><p>Review this person’s assigned work and recorded actions. Interventions use your Superadmin account and require a reason.</p></div></div>
     <div className="stat-grid">{[['Open support requests',ticketCount],['Open review cases',caseCount],['Recorded actions',activityCount],['Active sign-in sessions',sessionCount]].map(([label,count])=><section className="card conversation" key={label}><p className="muted small">{label}</p><strong>{count}</strong></section>)}</div>
     <nav className="section-tabs" aria-label="Staff details">{[['work','Assigned work'],['activity','Activity'],['access','Access settings']].map(([value,label])=><Link key={value} className={'btn '+(tab===value?'btn-primary':'')} href={'?tab='+value} aria-current={tab===value?'page':undefined}>{label}</Link>)}</nav>
     {tab==='access'&&<StaffAccessForm person={person}/>}
     <div hidden={tab!=='work'}><section className="card conversation"><h2>Assigned support requests</h2><p>Open a request to read the conversation, reassign it, change its status, or add coaching feedback.</p>{tickets.length?tickets.map(ticket=><p className="staff-work-row" key={ticket.id}><Link href={`/dashboard/support/${ticket.id}`}><strong>{supportSubject(ticket.message,ticket.category)}</strong><span className="muted small">{ticket.customer.name} · {ticket.booking?.refCode??ticket.category.replaceAll('_',' ')}</span></Link><span><ReviewBadge value={ticket.status} status /><small className="muted">Updated {phTime(ticket.updatedAt)}</small></span></p>):<p className="muted">No open support requests assigned.</p>}{pagination('tickets')}</section>
-    <section className="card conversation"><h2>Assigned reviews & escalations</h2><p>Open a case to review evidence, reassign its reviewer, or record an independent decision. Existing approval rules still apply.</p>{cases.length?cases.map(record=><p key={record.id}><Link href={`/dashboard/cases/${record.id}`}>{record.title}</Link><br/><span className="muted small">{reviewLabel(record.kind)} · <ReviewBadge value={record.status} status /> · <ReviewBadge value={record.priority} /></span></p>):<p className="muted">No open review cases assigned.</p>}{pagination('cases')}</section>
+    <section className="card conversation"><h2>Assigned review cases</h2><p>Open a case to review evidence, reassign its reviewer, or record an independent decision. Existing approval rules still apply.</p>{cases.length?cases.map(record=><p key={record.id}><Link href={`/dashboard/cases/${record.id}`}>{record.title}</Link><br/><span className="muted small">{reviewLabel(record.kind)} · <ReviewBadge value={record.status} status /> · <ReviewBadge value={record.priority} /></span></p>):<p className="muted">No open review cases assigned.</p>}{pagination('cases')}</section>
     </div><section hidden={tab!=='activity'} className="card conversation"><h2>Recorded staff activity</h2><p>Actions recorded under this staff member’s own account.</p>{activity.length?activity.map(record=>{const link=target(record.entityType,record.entityId);return <article className="conversation-message" key={record.id}><strong>{eventTitle(record.action)}</strong><time dateTime={record.createdAt.toISOString()}>{phTime(record.createdAt)}</time>{link?<Link href={link}>Open related {record.entityType.toLowerCase()} →</Link>:<span>{record.entityType} · {record.entityId}</span>}</article>;}):<p className="muted">No recorded activity yet.</p>}{pagination('activity')}</section>
   </div>;
 }

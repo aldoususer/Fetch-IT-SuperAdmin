@@ -48,14 +48,14 @@ function fixture(role='SUPPORT') {
     ['next/navigation',{notFound(){throw new Error('NOT_FOUND');},useRouter:()=>({replace(){},refresh(){}}),usePathname:()=>'/dashboard/cases',useSearchParams:()=>new URLSearchParams()}],
     ['next/link',{__esModule:true,default:({children,...props})=>React.createElement('a',props,children)}],
   ]);
-  const body={kind:'ESCALATION',ticketId:'ticket',title:'Need help',helpReason:'A repeated unresolved complaint.',tried:'Checked the booking and contacted the rider.',priority:'HIGH'};
+  const body={kind:'SAFETY',ticketId:'ticket',title:'Need help',helpReason:'A repeated unresolved complaint.',tried:'Checked the booking and contacted the rider.',priority:'HIGH'};
   return {actor,ticket,cases,notes,audits,queries,overrides,body,
     async create(change={},origin='https://test.invalid'){const route=load('src/app/api/cases/route.ts',overrides);return route.POST(new NextRequest('https://test.invalid/api/cases',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({...body,...change})}));},
     async patch(change={}){const route=load('src/app/api/cases/[id]/route.ts',overrides);return route.PATCH(new NextRequest('https://test.invalid/api/cases/case',{method:'PATCH',headers:{origin:'https://test.invalid','content-type':'application/json'},body:JSON.stringify({version:1,reason:'Test intervention',...change})}),{params:Promise.resolve({id:'case'})});},
   };
 }
-test('Finance is retired: no login role or permissions, but old accounts can be managed',()=>{
-  assert.equal(policy.isStaffRole('FINANCE'),false);assert.equal(policy.isManagedStaffRole('FINANCE'),true);
+test('Retired roles have no permissions; Admin can review payments',()=>{
+  assert.equal(policy.isStaffRole('FINANCE'),false);assert.equal(policy.isStaffRole('SUPPORT_SUPERVISOR'),false);
   for(const permission of ['operations','support','finance','safety'])assert.equal(policy.hasPermission('FINANCE',permission),false);
   assert.equal(policy.hasPermission('ADMIN','finance'),true);assert.equal(policy.hasPermission('SUPERADMIN','finance'),true);
 });
@@ -64,14 +64,14 @@ test('CS scope contains only their own handoffs, including Safety; no unassigned
   assert.equal(matches({createdById:'other',assignedToId:null,kind:'ESCALATION'},scope),false);
   assert.equal(matches({createdById:'staff',kind:'SAFETY'},scope),true);
 });
-test('Only supervisor/Admin can review escalations; Safety cannot claim them',()=>{
+test('Retired cases cannot be reviewed, and Safety and payment permissions are distinct',()=>{
   for(const role of ['SUPPORT','SAFETY','FINANCE'])assert.equal(policy.canReviewCase(role,'ESCALATION'),false);
-  for(const role of ['SUPPORT_SUPERVISOR','ADMIN','SUPERADMIN'])assert.equal(policy.canReviewCase(role,'ESCALATION'),true);
+  for(const role of ['SUPPORT_SUPERVISOR','ADMIN','SUPERADMIN'])assert.equal(policy.canReviewCase(role,'ESCALATION'),false);
   assert.equal(policy.canReviewCase('SAFETY','SAFETY'),true);
   assert.equal(policy.canReviewCase('SUPPORT_SUPERVISOR','SAFETY'),false);
-  assert.equal(policy.caseReviewerRoles('ESCALATION').includes('SUPPORT'),false);
+  assert.deepEqual(Array.from(policy.caseReviewerRoles('FINANCE')),['ADMIN']);
 });
-for(const kind of ['ESCALATION','SAFETY'])test(`CS sends ${kind} handoff with linked records and both internal answers`,async()=>{
+for(const kind of ['SAFETY'])test(`CS sends ${kind} handoff with linked records and both internal answers`,async()=>{
   const f=fixture();const response=await f.create({kind});assert.equal(response.status,201);
   const record=f.cases[0];assert.equal(record.status,'OPEN');assert.equal(record.priority,'HIGH');assert.equal(record.ticketId,'ticket');assert.equal(record.bookingId,'booking');assert.equal(record.createdById,'staff');
   assert.match(record.summary,/A repeated unresolved complaint/);assert.match(record.summary,/What have you already tried/);assert.match(record.summary,/contacted the rider/);
@@ -83,20 +83,19 @@ for(const [label,change] of [['missing priority',{priority:undefined}],['invalid
 test('CS must claim the original customer request before sending',async()=>{
   const f=fixture();f.ticket.assignedAdminId=null;assert.equal((await f.create()).status,403);assert.equal(f.cases.length,0);
 });
-test('CS cannot create a detached case or route to removed Finance',async()=>{
-  for(const change of [{ticketId:undefined},{kind:'FINANCE'}]){const f=fixture();assert.equal((await f.create(change)).status,403);assert.equal(f.cases.length,0);}
+test('CS cannot create a detached case or open a payment review',async()=>{
+  for(const [change,status] of [[{ticketId:undefined},400],[{kind:'FINANCE'},403]]){const f=fixture();assert.equal((await f.create(change)).status,status);assert.equal(f.cases.length,0);}
 });
 test('Foreign origins cannot create a handoff',async()=>{const f=fixture();assert.equal((await f.create({},'https://foreign.invalid')).status,403);assert.equal(f.cases.length,0);});
-test('Duplicate active handoffs are rejected; supervisor and Safety remain separate destinations',async()=>{
-  const f=fixture();assert.equal((await f.create()).status,201);assert.equal((await f.create()).status,409);assert.equal((await f.create({kind:'SAFETY'})).status,201);assert.equal(f.cases.length,2);
+test('Duplicate Safety handoffs and retired case types are rejected',async()=>{
+  const f=fixture();assert.equal((await f.create()).status,201);assert.equal((await f.create()).status,409);assert.equal((await f.create({kind:'ESCALATION'})).status,400);assert.equal(f.cases.length,1);
 });
 for(const action of ['claim','assign','recommend','decide','close'])test(`CS cannot ${action} the receiving team's case through the API`,async()=>{
   const f=fixture();await f.create();assert.equal((await f.patch({action,assignedToId:'reviewer',recommendation:'text',outcome:'APPROVED'})).status,403);assert.equal(f.cases[0].status,'OPEN');
 });
 test('CS can append supporting information to their own handoff',async()=>{const f=fixture();await f.create();assert.equal((await f.patch({action:'note',note:'Additional reported facts'})).status,200);assert.equal(f.notes[0].authorId,'staff');});
 test('A resolved handoff is read-only',async()=>{const f=fixture();await f.create();f.cases[0].status='RESOLVED';assert.equal((await f.patch({action:'note',note:'More'})).status,409);assert.equal(f.notes.length,0);});
-test('Supervisor starts an unassigned escalation; it becomes In review',async()=>{const f=fixture('SUPPORT_SUPERVISOR');await f.create();assert.equal((await f.patch({action:'claim'})).status,200);assert.equal(f.cases[0].status,'IN_REVIEW');});
-test('A supervisor cannot assign a normal CS agent as escalation reviewer',async()=>{const f=fixture('SUPPORT_SUPERVISOR');await f.create();assert.equal((await f.patch({action:'assign',assignedToId:'reviewer'})).status,400);});
+test('Admin cannot assign a normal CS agent as Safety reviewer',async()=>{const f=fixture('ADMIN');await f.create();assert.equal((await f.patch({action:'assign',assignedToId:'reviewer'})).status,400);});
 test('Safety can start Safety cases but cannot read another team case',async()=>{
   const f=fixture();await f.create({kind:'SAFETY'});f.actor.role='SAFETY';assert.equal((await f.patch({action:'claim'})).status,200);
   f.cases[0].kind='ESCALATION';assert.equal((await f.patch({action:'claim',version:2})).status,404);
@@ -109,13 +108,13 @@ test('Internal approval stages remain In review without losing the Admin gate',(
   assert.equal(queue.readQueue({sort:'priority',priority:'HIGH'},false).sort,'oldest');
   assert.equal(queue.readQueue({priority:'HIGH'},false).priority,'');
 });
-for(const role of ['SUPPORT','SUPPORT_SUPERVISOR','SAFETY','ADMIN'])test(`${role} queue renders only its intended filters`,async()=>{
+for(const role of ['SUPPORT','SAFETY','ADMIN'])test(`${role} queue renders only its intended filters`,async()=>{
   const f=fixture(role), module=load('src/components/review-pages.tsx',f.overrides);
   const html=renderToStaticMarkup(await module.CasesPage({searchParams:Promise.resolve({team:'finance',kind:'FINANCE',sort:'priority'})}));
   assert.doesNotMatch(html,/name="team"|name="kind".*All accessible|Queue default|Apply filters|Highest priority/);
   assert.equal(html.includes('name="priority"'),role!=='SUPPORT');
   assert.match(html,/Oldest first/);assert.match(html,/Newest first/);
-  if(role==='SUPPORT')assert.match(html,/My escalated requests/);
+  if(role==='SUPPORT')assert.match(html,/Safety handoffs/);
 });
 test('CS tracking hides private findings and receiver notes; reviewer sees the handoff and conversation',async()=>{
   const f=fixture();await f.create({kind:'SAFETY'});Object.assign(f.cases[0],{recommendation:'PRIVATE FINDINGS',decision:'PRIVATE DECISION'});
